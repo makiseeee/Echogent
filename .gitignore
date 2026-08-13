@@ -1,0 +1,26 @@
+# 依赖与构建产物
+node_modules/
+*.log
+
+# AstrBot 数据（含密钥、数据库、日志）
+astrbot/data/
+
+# 备份产物
+backups/
+
+# 环境变量与密钥
+.env
+.env.*
+
+# 用户私密档案（含电话/邮箱，不入库）
+wenbo-profile.md
+
+# 个人记忆/偏好（含 QQ 号、作息等私密信息，不入公开库）
+memory/
+MEMORY.md
+USER.md
+personality-log.md
+
+# 系统
+.DS_Store
+Thumbs.db
