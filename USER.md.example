@@ -1,0 +1,7 @@
+# USER.md - 用户模型（本地私密，不入库）
+#
+# 用一条条指令记录关于用户的稳定偏好。每条以 Always / Never / Prefer 开头，
+# 前面加观测日期和状态；偏好改变时把旧条目标记为 superseded，就地重写。
+
+<!-- observed: YYYY-MM-DD | status: active -->
+- 称呼用户为 wenbo；QQ 私聊是日常主要交流渠道。

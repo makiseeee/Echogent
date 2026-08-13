@@ -7,6 +7,7 @@ astrbot/data/
 
 # 备份产物
 backups/
+!backups/README.md
 
 # 环境变量与密钥
 .env
@@ -20,6 +21,11 @@ memory/
 MEMORY.md
 USER.md
 personality-log.md
+!memory/README.md
+
+# AstrBot 数据（含密钥、数据库、日志）
+astrbot/data/
+!astrbot/data/README.md
 
 # 系统
 .DS_Store
