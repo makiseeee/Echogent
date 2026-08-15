@@ -1,0 +1,30 @@
+[Unit]
+Description=Echo minimal MCP executor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/wenbo/aaage/mcp-executor
+EnvironmentFile=/home/wenbo/aaage/mcp-executor/.env
+ExecStart=/home/wenbo/.local/share/uv/tools/astrbot/bin/python3 /home/wenbo/aaage/mcp-executor/server.py --transport streamable-http
+Restart=always
+RestartSec=3
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryMax=512M
+TasksMax=64
+
+[Install]
+WantedBy=default.target

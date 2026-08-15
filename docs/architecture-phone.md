@@ -16,10 +16,10 @@
 │   ├─ DeepSeek(云端 API)            │   ├─ run_shell
 │   ├─ 记忆 / 画像 / 知识库           │   └─ 文件读写 / 系统控制(可选)
 │   └─ 插件 / 表情包                  └─ Tailscale 节点
-└─ Tailscale 节点 ◄═══ 加密隧道 ═══► Tailscale 网络
+└─ ZeroTier 节点 ◄═══ 加密隧道 ═══► ZeroTier 网络
 ```
 
-消息流：wenbo 发 QQ → 腾讯 → 家里 NapCat → 家里 AstrBot →（需要执行时）经 Tailscale
+消息流：wenbo 发 QQ → 腾讯 → 家里 NapCat → 家里 AstrBot →（需要执行时）经 ZeroTier
 调学校电脑 MCP Server → 结果回传 → echo 傲娇回复。
 
 ## 关键决策
@@ -31,10 +31,10 @@
 - 方案成熟：`NapNeko/NapCat-Termux`（ZeroTermux + bookworm + linuxqq，官方项目）
 - 风险：手机发热/电池 → 需要"永不休眠 + 充电策略"
 
-### 2. 网络 = Tailscale（推荐）
+### 2. 网络 = ZeroTier（已落地）
 
-- 免费、无需公网 IP、端到端加密；学校 NAT 也能通（DERP 中继兜底）
-- 手机 AstrBot 通过 tailnet 私有 IP 连电脑 MCP Server
+- 不依赖 Google 框架，无需公网 IP，适合当前旧手机环境
+- 手机 AstrBot 通过 ZeroTier 私有 IP 连电脑 MCP Server
 - 备选：frp（需要一台有公网 IP 的服务器，暴露端口有风险）
 
 ### 3. 电脑执行端 = MCP Server
@@ -43,7 +43,7 @@
 - 现成方案：`ssh-mcp`（基于 SSH 远程执行，最快落地）
 - 更定制：自写一个 MCP Server（fastmcp / 官方 SDK），暴露
   `run_python` / `run_shell` / `read_file` / `write_file`（限目录 + token 鉴权）
-- 安全：只监听 tailnet 地址 + Bearer token；代码执行可再套 docker 沙盒
+- 安全：Windows 防火墙仅允许手机 ZeroTier 地址 + Bearer token；代码执行仍受工具白名单和目录限制
 
 ### 4. 手机端嵌入模型
 
@@ -67,12 +67,12 @@
 |---|---|---|
 | P1 | 电脑端 MCP Server（先在 WSL 做好） | AstrBot→MCP 远程执行跑通 |
 | P2 | 手机 Termux 部署（proot Ubuntu + AstrBot + NapCat），数据迁移，QQ 登录切换 | 手机端独立可聊 |
-| P3 | Tailscale 组网 + 联调 | 学校电脑开机时远程执行可用、离线降级正常 |
+| P3 | ZeroTier 组网 + 联调 | 学校电脑开机时远程执行可用、离线降级正常 |
 | P4 | 稳定性：自启、监控、备份、发热控制 | 连续运行 48h 无异常 |
 
 ## 风险与待确认
 
 - QQ 登录迁移：手机扫码登录机器人号，原电脑 NapCat 停用
-- Tailscale 在学校网络的可达性（DERP 中继是否通，需实测）
+- ZeroTier 在不同外网环境下的长期稳定性仍需实测
 - 手机内存：建议 4GB+；2GB 跑 proot Ubuntu + AstrBot + NapCat 会比较吃力
 - 执行能力仅在学校电脑开机时可用（可加"电脑开机自动连 tailnet + 起 MCP"）
