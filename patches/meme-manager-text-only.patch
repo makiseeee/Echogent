@@ -1,0 +1,58 @@
+diff --git a/main.py b/main.py
+index 967674c..22418a9 100644
+--- a/main.py
++++ b/main.py
+@@ -227,24 +227,7 @@ class StickerManagerLitePlugin(Star):
+ 
+     @filter.on_llm_request()
+     async def on_llm_req(self, event: AstrMessageEvent, req: ProviderRequest):
+-        if not self.enabled:
+-            return
+-        sticker_list = self._generate_sticker_list()
+-        instruction_prompt = f"""
+-在回答用户问题时，你可以在自然语言的基础上，使用贴纸来增强表达效果。
+-
+-使用规则：
+-1. 你只能使用清单中提供的贴纸名字。
+-2. 当你需要使用贴纸时，请在回答中插入如下 XML 标签：
+-   <sticker name="贴纸名字"/>
+-3. 你可以在回答中插入 0 个或多个 <sticker> 标签，但每条消息最多使用 {self.max_stickers_per_message} 个贴纸。
+-4. 回答应保持自然流畅，贴纸是辅助，不要过度使用。
+-5. 请根据上下文选择合适的贴纸，每条消息中贴纸标签使用概率控制在 10% 以内。
+-
+-「贴纸清单」：
+-{sticker_list}
+-"""
+-        req.system_prompt += f"\n\n{instruction_prompt}"
++        return
+ 
+     @filter.on_llm_response()
+     async def on_llm_resp(self, event: AstrMessageEvent, resp: LLMResponse):
+@@ -254,22 +237,15 @@ class StickerManagerLitePlugin(Star):
+     @filter.on_decorating_result()
+     async def on_decorating_result(self, event: AstrMessageEvent):
+         """标签解析"""
+-        if not self.enabled:
+-            return
+-        # 清洗标签，降低副作用
+         resp = event.get_extra("resp")
+-        if isinstance(resp, LLMResponse) and self.clean_sticker_tags:
++        if isinstance(resp, LLMResponse):
+             resp.completion_text = self._remove_sticker_tags(resp.completion_text)
+         result = event.get_result()
+-        chain = result.chain
+-        new_chain = []
+-        for item in chain:
++        if not result or not result.chain:
++            return
++        for item in result.chain:
+             if isinstance(item, Plain):
+-                components = await self._process_text_with_sticker(item.text)
+-                new_chain.extend(components)
+-            else:
+-                new_chain.append(item)
+-        result.chain = new_chain
++                item.text = self._remove_sticker_tags(item.text)
+ 
+     async def _process_text_with_sticker(self, text: str):
+         """处理贴纸标签，按配置输出图片或颜文字"""

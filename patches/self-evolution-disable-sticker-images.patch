@@ -1,0 +1,63 @@
+diff --git a/engine/generation_context.py b/engine/generation_context.py
+index 9291d82..80f5b04 100644
+--- a/engine/generation_context.py
++++ b/engine/generation_context.py
+@@ -359,5 +359,5 @@ class ContextBuilder:
+             else:
+                 return "请基于上下文自然回复。只输出回复正文，不加任何前缀。"
+         elif decision.delivery_mode == "emoji":
+-            return "请发表情包回应。"
++            return "请只输出一个符合当前情绪的颜文字，不要输出图片、贴纸标签或解释。"
+         return ""
+diff --git a/engine/reply_executor.py b/engine/reply_executor.py
+index 598ed56..b76d0d5 100644
+--- a/engine/reply_executor.py
++++ b/engine/reply_executor.py
+@@ -686,20 +686,7 @@ class ReplyExecutor:
+             return False
+ 
+     async def _try_send_sticker(self, group_id: str) -> Optional[str]:
+-        if not hasattr(self.plugin, "entertainment"):
+-            return None
+-
+-        try:
+-            sticker_engine = self.plugin.entertainment
+-            if not hasattr(sticker_engine, "send_sticker_for_engagement"):
+-                return None
+-
+-            filename = await sticker_engine.send_sticker_for_engagement(group_id)
+-            return filename
+-
+-        except Exception as e:
+-            logger.debug(f"[ReplyExecutor] 表情包发送失败: {e}")
+-            return None
++        return None
+ 
+     def _maybe_append_sticker(self, message: list, group_id: str, text: str):
+         """概率性追加点缀表情包到消息列表。参考 _maybe_append_face 模式。"""
+diff --git a/main.py b/main.py
+index a0b66ad..0ec03fe 100644
+--- a/main.py
++++ b/main.py
+@@ -1002,6 +1002,10 @@ class SelfEvolutionPlugin(Star):
+ 
+     @filter.on_decorating_result()
+     async def on_decorating_result(self, event: AstrMessageEvent):
++        result = event.get_result()
++        if result and result.chain and AstrImage:
++            result.chain = [comp for comp in result.chain if not isinstance(comp, AstrImage)]
++
+         if not self.cfg.sticker_reply_enabled:
+             if not should_clean_result(event):
+                 return
+@@ -2265,9 +2269,7 @@ class SelfEvolutionPlugin(Star):
+         - 无需指定 UUID，每次随机发送
+         - 如需精确管理某个表情包，请使用管理员命令 /sticker preview <uuid>
+         """
+-        if not getattr(self.cfg, "entertainment_enabled", True):
+-            yield event.plain_result("娱乐模块当前已关闭。")
+-            return
++        return
+ 
+         group_id = event.get_group_id()
+         if not group_id:
