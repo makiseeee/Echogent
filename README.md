@@ -3,9 +3,9 @@
 ## 架构
 
 ```text
-手机 QQ ──→ NapCat(Docker, OneBot v11) ──→ AstrBot(反向 WS 6199) ──→ DeepSeek v4-flash
+手机 QQ ──→ NapCat(Termux/Ubuntu, OneBot v11) ──→ AstrBot(反向 WS 6199) ──→ DeepSeek v4-flash
                                               │
-                                              ├─ Ollama(bge-m3) 本地嵌入 → 知识库 RAG
+                                              ├─ ZeroTier → 电脑 Ollama(bge-m3) → 手机知识库 RAG
                                               ├─ self_evolution：记忆/画像/好感度/每日16:00总结
                                               ├─ meme_manager_lite：表情包（49张精选，发前压缩250px）
                                               ├─ echo-tools：Bing 搜索 / 网页抓取 / 安全计算器
@@ -44,6 +44,9 @@ journalctl --user -u echo-mcp.service -f
 # Ollama（本地嵌入）
 systemctl --user status ollama.service
 
+# ZeroTier 远程维护手机
+ssh -i ~/.ssh/echo-phone -p 8022 u0_a200@10.144.13.0
+
 # 定时器
 systemctl --user list-timers | grep echo
 ```
@@ -61,4 +64,6 @@ WebUI：http://127.0.0.1:6185（账号密码见本地配置 `astrbot/data/cmd_co
 
 - **echo-kb 知识库**：静态资料（简历、偏好），`astr_kb_search` 按需检索
 - **self_evolution 记忆库**：动态记忆（会话总结、画像、情绪），每日 16:00 自动写入
+- 记忆与知识库主副本均在手机；电脑只提供 `bge-m3` 向量计算
+- 电脑离线导致的知识库上传会进入手机待处理队列，每 30 分钟自动补录
 - 临时脚本统一放 `astrbot/data/temp/echo-scripts/`，每日 04:00 自动清理

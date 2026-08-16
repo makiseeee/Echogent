@@ -1,0 +1,142 @@
+diff --git a/engine/session_memory_store.py b/engine/session_memory_store.py
+index 844121f..5883eac 100644
+--- a/engine/session_memory_store.py
++++ b/engine/session_memory_store.py
+@@ -3,6 +3,7 @@ import json
+ import logging
+ import time
+ from datetime import datetime
++from pathlib import Path
+ from typing import Optional
+ 
+ logger = logging.getLogger("astrbot")
+@@ -13,6 +14,64 @@ PRIVATE_SCOPE_PREFIX = "private_"
+ class SessionMemoryStore:
+     def __init__(self, plugin):
+         self.plugin = plugin
++        self._pending_path = Path(plugin.data_dir) / "pending_kb_uploads.json"
++        self._pending_lock = asyncio.Lock()
++        self._retrying_pending = False
++
++    async def _queue_pending_summary(self, scope_id: str, memory: str, summary_date: str) -> None:
++        async with self._pending_lock:
++            pending = []
++            if self._pending_path.is_file():
++                try:
++                    pending = json.loads(self._pending_path.read_text(encoding="utf-8"))
++                except (OSError, json.JSONDecodeError):
++                    pending = []
++            item = {"scope_id": scope_id, "memory": memory, "summary_date": summary_date}
++            key = (scope_id, summary_date)
++            pending = [
++                entry
++                for entry in pending
++                if (entry.get("scope_id"), entry.get("summary_date")) != key
++            ]
++            pending.append(item)
++            temp_path = self._pending_path.with_suffix(".tmp")
++            temp_path.write_text(json.dumps(pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++            temp_path.replace(self._pending_path)
++
++    async def retry_pending_uploads(self) -> tuple[int, int]:
++        async with self._pending_lock:
++            if not self._pending_path.is_file():
++                return 0, 0
++            try:
++                pending = json.loads(self._pending_path.read_text(encoding="utf-8"))
++            except (OSError, json.JSONDecodeError):
++                return 0, 0
++
++        failed = []
++        succeeded = 0
++        self._retrying_pending = True
++        try:
++            for item in pending:
++                result = await self.save_daily_summary(
++                    str(item.get("scope_id", "")),
++                    str(item.get("memory", "")),
++                    str(item.get("summary_date", "")),
++                )
++                if "失败" in result or "不可用" in result:
++                    failed.append(item)
++                else:
++                    succeeded += 1
++        finally:
++            self._retrying_pending = False
++
++        async with self._pending_lock:
++            if failed:
++                temp_path = self._pending_path.with_suffix(".tmp")
++                temp_path.write_text(json.dumps(failed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++                temp_path.replace(self._pending_path)
++            else:
++                self._pending_path.unlink(missing_ok=True)
++        return succeeded, len(failed)
+ 
+     def _debug(self, msg: str):
+         if hasattr(self.plugin, "cfg") and self.plugin.cfg.memory_debug_enabled:
+@@ -220,6 +279,8 @@ class SessionMemoryStore:
+ 
+         except Exception as e:
+             logger.warning(f"[MemoryStore] 保存总结失败: {e}")
++            if not self._retrying_pending:
++                await self._queue_pending_summary(scope_id, memory, summary_date)
+             return f"保存总结失败: {e}"
+ 
+     async def save_session_event(
+diff --git a/scheduler/register.py b/scheduler/register.py
+index 8a9e2c4..ecbccd6 100644
+--- a/scheduler/register.py
++++ b/scheduler/register.py
+@@ -7,6 +7,7 @@ from .tasks import (
+     scheduled_github_check,
+     scheduled_interject,
+     scheduled_memory_summary,
++    scheduled_memory_upload_retry,
+     scheduled_persona_consolidation,
+     scheduled_persona_rumination,
+     scheduled_persona_thought,
+@@ -113,6 +114,14 @@ async def register_tasks(plugin):
+                 persistent=True,
+             )
+             logger.info(f"[SelfEvolution] 已注册 MemorySummary: {summary_cron}")
++            await cron_mgr.add_basic_job(
++                name="SelfEvolution_MemoryUploadRetry",
++                cron_expression="*/30 * * * *",
++                handler=lambda: scheduled_memory_upload_retry(plugin),
++                description="SelfEvolution: retry pending knowledge-base uploads",
++                persistent=True,
++            )
++            logger.info("[SelfEvolution] 已注册 MemoryUploadRetry: */30 * * * *")
+ 
+         if plugin.cfg.interject_enabled:
+             interject_interval = plugin.cfg.interject_interval
+diff --git a/scheduler/tasks.py b/scheduler/tasks.py
+index 503bdf0..87e5024 100644
+--- a/scheduler/tasks.py
++++ b/scheduler/tasks.py
+@@ -271,6 +271,24 @@ async def _memory_summary_impl(plugin):
+         await summarizer.daily_summary()
+ 
+ 
++async def scheduled_memory_upload_retry(plugin) -> ScheduledTaskResult:
++    """Retry knowledge-base uploads that failed while the computer embedding service was offline."""
++    store = getattr(plugin, "session_memory_store", None)
++    if not store:
++        return ScheduledTaskResult(
++            task_name="MemoryUploadRetry", scope_id=None, success=True, skipped=True, reason="store unavailable"
++        )
++    succeeded, failed = await store.retry_pending_uploads()
++    logger.info(f"[Scheduler] MemoryUploadRetry succeeded={succeeded} pending={failed}")
++    return ScheduledTaskResult(
++        task_name="MemoryUploadRetry",
++        scope_id=None,
++        success=failed == 0,
++        skipped=succeeded == 0 and failed == 0,
++        reason=f"succeeded={succeeded}, pending={failed}",
++    )
++
++
+ async def scheduled_interject(plugin) -> ScheduledTaskResult:
+     """主动插嘴定时任务 - 获取群消息，LLM判断是否需要插嘴"""
+     scopes, skip_reason = await _resolve_target_scopes(plugin, "Interject", include_private=False, include_groups=True)
