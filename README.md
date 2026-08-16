@@ -1,69 +1,60 @@
-# echo 
+# Echogent
 
-## 架构
+基于 AstrBot 的 QQ Agent。手机负责 7x24 小时聊天、记忆和知识库，电脑按需提供受限代码执行与 Ollama Embedding。
+
+## 当前架构
 
 ```text
-手机 QQ ──→ NapCat(Termux/Ubuntu, OneBot v11) ──→ AstrBot(反向 WS 6199) ──→ DeepSeek v4-flash
-                                              │
-                                              ├─ ZeroTier → 电脑 Ollama(bge-m3) → 手机知识库 RAG
-                                              ├─ self_evolution：记忆/画像/好感度/每日16:00总结
-                                              ├─ meme_manager_lite：表情包（49张精选，发前压缩250px）
-                                              ├─ echo-tools：Bing 搜索 / 网页抓取 / 安全计算器
-                                              └─ echo-executor MCP：受限 Python / 只读工作区
+QQ
+  -> 手机 NapCat / OneBot v11
+  -> 手机 AstrBot
+       -> DeepSeek：对话
+       -> self_evolution：记忆、画像、每日总结
+       -> echo-tools：搜索、网页抓取、计算器
+       -> kaomoji：颜文字反应
+       -> ZeroTier -> 电脑 MCP：受限 Python、只读文件
+       -> ZeroTier -> 电脑 Ollama bge-m3：知识库向量
 ```
 
-## 目录结构
+手机是运行数据、记忆和知识库的主副本。电脑关闭时，QQ 对话和已有记忆仍可用；远程执行、新增知识向量会暂时不可用，失败的每日总结每 30 分钟自动补录。
 
-- `astrbot/` —— AstrBot 工作目录（`data/cmd_config.json` 主配置、`data/plugins/` 插件、`data/knowledge_base/` 知识库索引、`data/plugin_data/` 表情与记忆数据）
-- `SOUL.md` / `USER.md` / `MEMORY.md` / `IDENTITY.md` / `personality-log.md` —— 人设与记忆体系
-- `memory/` —— 每日日志
-- `wenbo-profile.md` —— 用户简历（私密，仅知识库按需引用）
-- `assets/stickers/` —— 表情包源图（49 张）
-- `scripts/backup.sh` —— 每日备份脚本
-- `mcp-executor/` —— 本机最小 MCP 执行服务
-- `systemd/echo-mcp.service` —— MCP 用户服务模板
-- `scripts/install-mcp-local.sh` —— 安装、配置并启动本机 MCP
-- `tools/napcat-setup.sh` —— NapCat 安装脚本（参考）
-- `backups/` —— 备份产物（自动保留 14 天）
+## 文档入口
 
-## 运维命令
+- [文档索引](docs/README.md)
+- [当前架构](docs/architecture.md)
+- [日常运维](docs/operations.md)
+- [网络与安全](docs/security.md)
+- [剩余工作](docs/roadmap.md)
+- [历史迁移记录](docs/archive/README.md)
+
+## 常用命令
 
 ```bash
-# 状态
-bash agent-status.sh
+# 远程登录手机 Termux
+ssh phone-echo
 
-# AstrBot
-systemctl --user status astrbot.service
-systemctl --user restart astrbot.service
-journalctl --user -u astrbot.service -f
+# 查看手机服务
+ssh -o RequestTTY=no phone-echo '~/echo-service status'
 
-# MCP 执行端
+# 进入手机 Ubuntu
+ssh phone-echo
+proot-distro login ubuntu
+
+# 查看电脑执行端
 systemctl --user status echo-mcp.service
-journalctl --user -u echo-mcp.service -f
 
-# Ollama（本地嵌入）
+# 查看电脑 Embedding 服务
 systemctl --user status ollama.service
-
-# ZeroTier 远程维护手机
-ssh -i ~/.ssh/echo-phone -p 8022 u0_a200@10.144.13.0
-
-# 定时器
-systemctl --user list-timers | grep echo
 ```
 
-WebUI：http://127.0.0.1:6185（账号密码见本地配置 `astrbot/data/cmd_config.json`，建议改密）
+## 目录
 
-## 备份与恢复
+- `scripts/`：手机部署、配置与电脑服务脚本
+- `systemd/`：电脑端用户服务模板
+- `mcp-executor/`：受限 MCP 执行端
+- `patches/`：本地插件定制补丁
+- `docs/`：当前文档与历史记录
+- `astrbot/`：电脑侧迁移源和恢复副本，不是当前在线主实例
+- `SOUL.md`、`USER.md`、`MEMORY.md`、`memory/`：人格与文本记忆源
 
-- 每日 03:30 自动备份到 `backups/echo-backup-*.tar.zst`（保留 14 天）
-- 为保证 SQLite/WAL 一致性，备份时会短暂停止 AstrBot，完成后自动拉起
-- 备份包含本地插件代码改动与精选表情，排除可重新下载的插件 Git 历史和默认大图库
-- 恢复：先 `systemctl --user stop astrbot.service`，再解包按原路径放回
-
-## 记忆机制
-
-- **echo-kb 知识库**：静态资料（简历、偏好），`astr_kb_search` 按需检索
-- **self_evolution 记忆库**：动态记忆（会话总结、画像、情绪），每日 16:00 自动写入
-- 记忆与知识库主副本均在手机；电脑只提供 `bge-m3` 向量计算
-- 电脑离线导致的知识库上传会进入手机待处理队列，每 30 分钟自动补录
-- 临时脚本统一放 `astrbot/data/temp/echo-scripts/`，每日 04:00 自动清理
+私密配置、Token、QQ 登录数据、数据库和手机运行数据不得提交到 GitHub。
