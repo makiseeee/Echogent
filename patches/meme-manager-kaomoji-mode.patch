@@ -1,0 +1,133 @@
+diff --git a/_conf_schema.json b/_conf_schema.json
+index d1a71d1..3cf9f8d 100644
+--- a/_conf_schema.json
++++ b/_conf_schema.json
+@@ -10,5 +10,12 @@
+         "type": "bool",
+         "hint": "开启后图片不会出现在llm上下文中，降低副作用，建议保持开启",
+         "default": true
++    },
++    "sticker_mode": {
++        "description": "贴纸输出模式",
++        "type": "string",
++        "hint": "kaomoji 输出颜文字，image 输出本地图片",
++        "default": "image",
++        "options": ["kaomoji", "image"]
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/main.py b/main.py
+index 06d38d7..bf2193b 100644
+--- a/main.py
++++ b/main.py
+@@ -26,8 +26,10 @@ class StickerManagerLitePlugin(Star):
+         super().__init__(context)
+         self.config = context.get_config()
+         self.max_stickers_per_message = self.config.get("max_stickers_per_message", 1)
++        self.max_side = int(self.config.get("max_side", 250))
+         # 是否清洗标签，默认开启
+         self.clean_sticker_tags = self.config.get("clean_sticker_tags", True)
++        self.sticker_mode = self.config.get("sticker_mode", "image")
+ 
+         self.PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
+         self.DATA_DIR = os.path.normpath(StarTools.get_data_dir())
+@@ -119,6 +121,60 @@ class StickerManagerLitePlugin(Star):
+                 logger.error(f"读取贴纸目录失败: {e}")
+         return None
+ 
++    def _prepare_sticker(self, image_path: str) -> str:
++        """发送前压缩图片：最长边压到 max_side，GIF 保留动画，带缓存。"""
++        try:
++            from PIL import Image, ImageSequence
++
++            ext = os.path.splitext(image_path)[1].lower()
++            is_gif = ext == ".gif"
++            mtime = int(os.path.getmtime(image_path))
++            key = os.path.splitext(os.path.basename(image_path))[0]
++            cache_dir = os.path.join(self.DATA_DIR, "cache")
++            os.makedirs(cache_dir, exist_ok=True)
++            out_path = os.path.join(
++                cache_dir,
++                f"{key}_{mtime}_{self.max_side}{ext}",
++            )
++            if os.path.exists(out_path):
++                return out_path
++
++            im = Image.open(image_path)
++            if max(im.size) <= self.max_side:
++                # 小图（任一边不超过 max_side）原样发送，不重新编码
++                im.close()
++                return image_path
++            if getattr(im, "is_animated", False):
++                frames = []
++                for frame in ImageSequence.Iterator(im):
++                    frame = frame.copy()
++                    frame.thumbnail((self.max_side, self.max_side), Image.LANCZOS)
++                    frames.append(frame)
++                duration = im.info.get("duration", 80)
++                frames[0].save(
++                    out_path,
++                    save_all=True,
++                    append_images=frames[1:],
++                    loop=0,
++                    duration=duration,
++                    optimize=True,
++                )
++            else:
++                im.thumbnail((self.max_side, self.max_side), Image.LANCZOS)
++                if im.mode in ("RGBA", "P", "LA"):
++                    im.convert("RGBA").save(out_path, optimize=True)
++                else:
++                    im.convert("RGB").save(
++                        out_path,
++                        "JPEG",
++                        quality=85,
++                        optimize=True,
++                    )
++            return out_path
++        except Exception as e:  # noqa: BLE001
++            logger.warning(f"贴纸压缩失败，发送原图: {e}")
++            return image_path
++
+     async def _image_to_data_url(self, image_path: str) -> Optional[str]:
+         """异步将图片文件转换为 dataurl 格式"""
+         try:
+@@ -211,9 +267,18 @@ class StickerManagerLitePlugin(Star):
+         result.chain = new_chain
+ 
+     async def _process_text_with_sticker(self, text: str):
+-        """处理包含sticker标签的文本，将其拆分成Plain、Image、Plain的格式"""
++        """处理贴纸标签，按配置输出图片或颜文字"""
+         components = []
+ 
++        kaomoji = {
++            "tsundere": ["(¬_¬)", "哼(￣^￣)", "(￣へ￣)"],
++            "cute": ["(｡･ω･｡)ﾉ♡", "(≧▽≦)", "(๑•ᴗ•๑)♡"],
++            "anime": ["(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧", "(๑˃̵ᴗ˂̵)و", "☆⌒(≧▽° )"],
++            "girl": ["(⁄ ⁄•⁄ω⁄•⁄ ⁄)", "(｡･･｡)", "(//▽//)"],
++            "actcute": ["(๑•́ ₃ •̀๑)", "(つ≧▽≦)つ", "(｡•́︿•̀｡)"],
++            "catgirl": ["ฅ( ̳• ·̫ • ̳ฅ)", "(ฅ´ω`ฅ)", "ฅ(=･ω･=)ฅ"],
++        }
++
+         try:
+             # 文本切割
+             pattern = r"(<sticker.*?/>)"
+@@ -235,9 +300,14 @@ class StickerManagerLitePlugin(Star):
+ 
+                     # 如果找到了sticker名称
+                     if sticker_name:
+-                        image_path = self._get_sticker_image_path(sticker_name)
+-                        if image_path:
+-                            components.append(Image.fromFileSystem(image_path))
++                        if self.sticker_mode == "kaomoji":
++                            choices = kaomoji.get(sticker_name, kaomoji["cute"])
++                            components.append(Plain(random.choice(choices)))
++                        else:
++                            image_path = self._get_sticker_image_path(sticker_name)
++                            if image_path:
++                                send_path = self._prepare_sticker(image_path)
++                                components.append(Image.fromFileSystem(send_path))
+                 else:
+                     components.append(Plain(part))
+ 
