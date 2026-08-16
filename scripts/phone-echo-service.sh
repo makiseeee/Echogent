@@ -7,7 +7,9 @@ PATH="$PREFIX/bin"
 export PREFIX HOME PATH
 
 SESSION="echo"
+NAPCAT_SESSION="napcat"
 PROOT="$PREFIX/bin/proot-distro"
+NAPCAT_SCRIPT="$HOME/phone-napcat-start.sh"
 COMMAND=(
   "$PROOT" login
   --bind "$HOME:/mnt/termux-home"
@@ -16,10 +18,31 @@ COMMAND=(
   /usr/bin/env TZ=Asia/Shanghai PYTHONUNBUFFERED=1
   /opt/echo-astrbot/bin/astrbot run
 )
+NAPCAT_COMMAND=(
+  "$PROOT" login
+  --bind "$HOME:/mnt/termux-home"
+  ubuntu --
+  /mnt/termux-home/phone-napcat-start.sh
+)
+
+stop_napcat_processes() {
+  "$PROOT" login ubuntu -- /bin/bash -lc \
+    "pkill -TERM -f '/root/Napcat/opt/QQ/[q]q' 2>/dev/null || true; pkill -TERM -x Xvfb 2>/dev/null || true" \
+    >/dev/null 2>&1 || true
+}
+
+start_napcat() {
+  if [ -x "$NAPCAT_SCRIPT" ] && ! tmux has-session -t "$NAPCAT_SESSION" 2>/dev/null; then
+    stop_napcat_processes
+    printf -v napcat_command '%q ' "${NAPCAT_COMMAND[@]}"
+    tmux new-session -d -s "$NAPCAT_SESSION" "$napcat_command"
+  fi
+}
 
 case "${1:-status}" in
   start)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
+      start_napcat
       echo "echo already running"
       exit 0
     fi
@@ -27,6 +50,7 @@ case "${1:-status}" in
     tmux new-session -d -s "$SESSION" "$command"
     for _ in $(seq 1 60); do
       if curl -fsS --max-time 2 http://127.0.0.1:6185/ >/dev/null; then
+        start_napcat
         echo "echo started: http://127.0.0.1:6185"
         exit 0
       fi
@@ -42,7 +66,13 @@ case "${1:-status}" in
       sleep 3
       tmux kill-session -t "$SESSION" 2>/dev/null || true
     fi
-    echo "echo stopped"
+    if tmux has-session -t "$NAPCAT_SESSION" 2>/dev/null; then
+      tmux send-keys -t "$NAPCAT_SESSION" C-c
+      sleep 2
+      tmux kill-session -t "$NAPCAT_SESSION" 2>/dev/null || true
+    fi
+    stop_napcat_processes
+    echo "echo and napcat stopped"
     ;;
   status)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
@@ -52,9 +82,18 @@ case "${1:-status}" in
     else
       echo "tmux=stopped"
     fi
+    if tmux has-session -t "$NAPCAT_SESSION" 2>/dev/null; then
+      echo "napcat=running"
+    else
+      echo "napcat=stopped"
+    fi
     ;;
   logs)
     tmux capture-pane -pt "$SESSION" -S -120
+    if tmux has-session -t "$NAPCAT_SESSION" 2>/dev/null; then
+      echo "--- napcat ---"
+      tail -120 /data/data/com.termux/files/usr/var/lib/proot-distro/containers/ubuntu/rootfs/root/napcat.log 2>/dev/null || true
+    fi
     ;;
   *)
     echo "usage: $0 {start|stop|status|logs}" >&2
