@@ -13,11 +13,12 @@ if not BACKUP.exists():
     shutil.copy2(CONFIG, BACKUP)
 
 config = json.loads(CONFIG.read_text(encoding="utf-8-sig"))
+config["enabled"] = False
 config["sticker_mode"] = "kaomoji"
 CONFIG.write_text(
     json.dumps(config, ensure_ascii=False, indent=2) + "\n",
     encoding="utf-8",
 )
 CONFIG.chmod(0o600)
-print("sticker_mode=kaomoji")
+print("image_stickers=disabled")
 print(f"backup={BACKUP}")

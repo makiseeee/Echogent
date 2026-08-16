@@ -1,0 +1,39 @@
+diff --git a/main.py b/main.py
+index e585561..a0b66ad 100644
+--- a/main.py
++++ b/main.py
+@@ -2232,7 +2232,6 @@ class SelfEvolutionPlugin(Star):
+ 
+     # ========== 表情包相关 LLM 工具 ==========
+ 
+-    @filter.llm_tool(name="list_stickers")
+     async def list_stickers_tool(self, event: AstrMessageEvent, limit: int = 10) -> str:
+         """列出可用的表情包（全局）。
+ 
+@@ -2256,7 +2255,6 @@ class SelfEvolutionPlugin(Star):
+ 
+         return "\n".join(result)
+ 
+-    @filter.llm_tool(name="send_sticker")
+     async def send_sticker_tool(self, event: AstrMessageEvent):
+         """在聊天中随机发送一个表情包。
+ 
+@@ -2316,6 +2314,18 @@ class SelfEvolutionPlugin(Star):
+         if skipped > 0:
+             yield event.plain_result(f"发送失败，已跳过 {skipped} 张问题表情包")
+ 
++    @filter.llm_tool(name="send_kaomoji")
++    async def send_kaomoji_tool(self, event: AstrMessageEvent, kaomoji: str):
++        """单独发送一个由你现场生成的颜文字
++
++        Args:
++            kaomoji(str): 根据当前情绪生成的单个颜文字，不附加解释、句子或图片标签
++        """
++        value = " ".join(str(kaomoji or "").split()).strip()
++        if not value:
++            return
++        yield event.plain_result(value[:40])
++
+     @filter.command_group("sticker")
+     def sticker_group(self):
+         """表情包管理"""

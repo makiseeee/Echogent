@@ -1,0 +1,45 @@
+diff --git a/_conf_schema.json b/_conf_schema.json
+index 3cf9f8d..288e364 100644
+--- a/_conf_schema.json
++++ b/_conf_schema.json
+@@ -1,4 +1,10 @@
+ {
++    "enabled": {
++        "description": "启用贴纸处理",
++        "type": "bool",
++        "hint": "关闭后不注入贴纸提示，也不发送图片贴纸",
++        "default": true
++    },
+     "max_stickers_per_message": {
+         "description": "每条消息最多使用的贴纸数量",
+         "type": "int",
+diff --git a/main.py b/main.py
+index bf2193b..967674c 100644
+--- a/main.py
++++ b/main.py
+@@ -25,6 +25,7 @@ class StickerManagerLitePlugin(Star):
+     def __init__(self, context: Context):
+         super().__init__(context)
+         self.config = context.get_config()
++        self.enabled = self.config.get("enabled", True)
+         self.max_stickers_per_message = self.config.get("max_stickers_per_message", 1)
+         self.max_side = int(self.config.get("max_side", 250))
+         # 是否清洗标签，默认开启
+@@ -226,6 +227,8 @@ class StickerManagerLitePlugin(Star):
+ 
+     @filter.on_llm_request()
+     async def on_llm_req(self, event: AstrMessageEvent, req: ProviderRequest):
++        if not self.enabled:
++            return
+         sticker_list = self._generate_sticker_list()
+         instruction_prompt = f"""
+ 在回答用户问题时，你可以在自然语言的基础上，使用贴纸来增强表达效果。
+@@ -251,6 +254,8 @@ class StickerManagerLitePlugin(Star):
+     @filter.on_decorating_result()
+     async def on_decorating_result(self, event: AstrMessageEvent):
+         """标签解析"""
++        if not self.enabled:
++            return
+         # 清洗标签，降低副作用
+         resp = event.get_extra("resp")
+         if isinstance(resp, LLMResponse) and self.clean_sticker_tags:
