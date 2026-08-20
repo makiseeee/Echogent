@@ -23,7 +23,12 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+from obsidian_access import AccessMode, VaultAccessPolicy
+from obsidian_search import list_notes, read_note_excerpt, search_vault
+from obsidian_write import NoteWriteService
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -34,6 +39,8 @@ MAX_FILE_BYTES = 64 * 1024
 MAX_OUTPUT_CHARS = 32_000
 MAX_TIMEOUT_SECONDS = 10
 MEMORY_LIMIT_BYTES = 256 * 1024 * 1024
+OBSIDIAN_MAX_RESULTS = 20
+_OBSIDIAN_WRITE_SERVICE: NoteWriteService | None = None
 
 
 def _allowed_roots() -> tuple[Path, ...]:
@@ -63,6 +70,28 @@ def _resolve_allowed_file(path: str) -> Path:
     if not any(resolved.is_relative_to(root) for root in roots):
         raise PermissionError("路径不在允许读取的工作区内")
     return resolved
+
+
+def _obsidian_policy() -> VaultAccessPolicy:
+    raw = os.environ.get("ECHO_OBSIDIAN_VAULT", "").strip()
+    if not raw:
+        raise RuntimeError("ECHO_OBSIDIAN_VAULT 未配置")
+    return VaultAccessPolicy(raw)
+
+
+def _obsidian_writer() -> NoteWriteService:
+    global _OBSIDIAN_WRITE_SERVICE
+    if _OBSIDIAN_WRITE_SERVICE is None:
+        audit_path = os.environ.get("ECHO_OBSIDIAN_AUDIT_DB", str(BASE_DIR / "obsidian-write-audit.db"))
+        _OBSIDIAN_WRITE_SERVICE = NoteWriteService(_obsidian_policy(), audit_path)
+    return _OBSIDIAN_WRITE_SERVICE
+
+
+def _obsidian_mode(scope: str) -> AccessMode:
+    try:
+        return AccessMode(scope)
+    except ValueError as exc:
+        raise ValueError("未知的 Obsidian 访问范围") from exc
 
 
 def _run_python_impl(code: str, timeout_seconds: int = MAX_TIMEOUT_SECONDS) -> str:
@@ -241,6 +270,127 @@ def read_file(path: str) -> str:
     return text
 
 
+def _verify_obsidian_caller(request: Request) -> None:
+    owner_id = os.environ.get("ECHO_OBSIDIAN_OWNER_ID", "").strip()
+    if not owner_id:
+        raise RuntimeError("ECHO_OBSIDIAN_OWNER_ID 未配置")
+    if request.headers.get("x-echo-chat-type") != "private":
+        raise PermissionError("Obsidian 仅允许本人私聊访问")
+    if not hmac.compare_digest(request.headers.get("x-echo-user-id", ""), owner_id):
+        raise PermissionError("发送者不是已授权用户")
+
+
+async def obsidian_api(request: Request) -> JSONResponse:
+    """Private HTTP bridge used by the event-aware phone plugin."""
+    try:
+        _verify_obsidian_caller(request)
+        body = await request.json()
+        action = str(body.get("action", ""))
+        mode = _obsidian_mode(str(body.get("scope", "standard")))
+        policy = _obsidian_policy()
+        if action == "search":
+            value = [
+                result.__dict__
+                for result in search_vault(policy, str(body.get("query", "")), mode, body.get("limit", OBSIDIAN_MAX_RESULTS))
+            ]
+        elif action == "list":
+            value = list_notes(policy, str(body.get("path", "1. Projects")), mode, body.get("limit", OBSIDIAN_MAX_RESULTS))
+        elif action == "read":
+            value = read_note_excerpt(
+                policy,
+                str(body.get("path", "")),
+                mode,
+                str(body.get("query", "")),
+                body.get("max_chars", 4_000),
+            ).__dict__
+        elif action == "prepare_create":
+            operation = _obsidian_writer().prepare(
+                request.headers.get("x-echo-user-id", ""),
+                str(body.get("path", "")),
+                str(body.get("title", "")),
+                str(body.get("content", "")),
+                body.get("links") or [],
+                body.get("metadata") or {},
+            )
+            value = {
+                "operation_id": operation.operation_id,
+                "path": operation.path,
+                "links": list(operation.links),
+                "expires_at": operation.expires_at.isoformat(),
+                "preview": operation.text,
+            }
+        elif action == "commit_create":
+            operation = _obsidian_writer().commit(
+                request.headers.get("x-echo-user-id", ""),
+                str(body.get("operation_id", "")),
+            )
+            value = {"created": operation.path, "links": list(operation.links)}
+        elif action == "cancel_create":
+            operation = _obsidian_writer().cancel(
+                request.headers.get("x-echo-user-id", ""),
+                str(body.get("operation_id", "")),
+            )
+            value = {"cancelled": operation.path}
+        elif action == "prepare_link":
+            operation = _obsidian_writer().prepare_link(
+                request.headers.get("x-echo-user-id", ""),
+                str(body.get("path", "")),
+                str(body.get("link_path", "")),
+                str(body.get("placement_hint", "")),
+            )
+            value = {
+                "operation_id": operation.operation_id,
+                "path": operation.path,
+                "link_path": operation.link_path,
+                "insertion": operation.heading,
+                "expires_at": operation.expires_at.isoformat(),
+            }
+        elif action == "commit_link":
+            operation = _obsidian_writer().commit_link(
+                request.headers.get("x-echo-user-id", ""), str(body.get("operation_id", ""))
+            )
+            value = {"updated": operation.path, "link": operation.link_path, "insertion": operation.heading}
+        elif action == "cancel_link":
+            operation = _obsidian_writer().cancel_link(
+                request.headers.get("x-echo-user-id", ""), str(body.get("operation_id", ""))
+            )
+            value = {"cancelled": operation.path}
+        else:
+            raise ValueError("未知的 Obsidian 操作")
+        return JSONResponse({"ok": True, "result": value})
+    except (OSError, PermissionError, ValueError, RuntimeError) as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=403)
+
+
+async def status_api(request: Request) -> JSONResponse:
+    payload = {
+        "online": True,
+        "service": "echo-executor",
+        "hostname": socket.gethostname(),
+        "capabilities": ["python_sandbox", "workspace_read", "obsidian_read", "obsidian_write"],
+        "time_utc": datetime.now(UTC).isoformat(),
+    }
+    return JSONResponse(payload)
+
+
+class ObsidianAPIMiddleware:
+    """Intercept the private bridge without replacing MCP's ASGI lifespan."""
+
+    def __init__(self, app: Any):
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http" and scope.get("path") == "/status":
+            response = await status_api(Request(scope, receive))
+            await response(scope, receive, send)
+            return
+        if scope.get("type") == "http" and scope.get("path") == "/obsidian":
+            response = await obsidian_api(Request(scope, receive))
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="echo minimal MCP executor")
     parser.add_argument(
@@ -264,7 +414,8 @@ def main() -> None:
 
     import uvicorn
 
-    app = BearerAuthMiddleware(mcp.streamable_http_app(), token)
+    app = ObsidianAPIMiddleware(mcp.streamable_http_app())
+    app = BearerAuthMiddleware(app, token)
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
 
 

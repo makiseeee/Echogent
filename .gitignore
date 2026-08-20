@@ -28,6 +28,12 @@ wenbo-profile.md
 .env.*
 mcp-executor/.env
 
+# 仅供本机所有者使用的操作手册（可能包含设备与个人工作流细节）
+docs/private/
+conversation-import/
+scripts/private/
+conversation.md
+
 # MCP 执行工作区（保留说明文件）
 mcp-executor/workspace/*
 !mcp-executor/workspace/README.md

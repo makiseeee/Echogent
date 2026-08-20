@@ -32,6 +32,24 @@ path.chmod(0o600)
 PY
 fi
 
+"$ASTRBOT_PYTHON" - "$ENV_FILE" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+defaults = {
+    "ECHO_OBSIDIAN_VAULT": "/mnt/d/wenboo",
+    "ECHO_OBSIDIAN_OWNER_ID": "1249403130",
+}
+present = {line.split("=", 1)[0] for line in text.splitlines() if "=" in line}
+for key, value in defaults.items():
+    if key not in present:
+        text += f"{key}={value}\n"
+path.write_text(text, encoding="utf-8")
+path.chmod(0o600)
+PY
+
 install -m 0644 "$UNIT_SOURCE" "$UNIT_TARGET"
 
 "$ASTRBOT_PYTHON" - "$ENV_FILE" "$MCP_CONFIG" <<'PY'

@@ -74,6 +74,14 @@ systemctl --user restart ollama.service
 journalctl --user -u ollama.service -f
 ```
 
+检查执行端对手机公开的状态：
+
+```bash
+curl -s http://127.0.0.1:8765/status
+```
+
+QQ 中发送 `/电脑状态` 会绕过 60 秒缓存立即探测。普通对话时插件会把在线状态和能力列表作为临时上下文注入模型，不写入聊天历史。
+
 端口检查：
 
 ```bash
@@ -128,6 +136,8 @@ curl -i --max-time 3 http://127.0.0.1:8765/mcp
 ```
 
 无 Token 返回 HTTP 401 是正常状态。
+
+`/status` 是无敏感数据的只读探针；正常返回 `online: true` 和能力列表。若 QQ 显示电脑离线，依次检查 WSL、`echo-mcp.service`、ZeroTier 和 Windows 防火墙。
 
 ### 新记忆未进入知识库
 
