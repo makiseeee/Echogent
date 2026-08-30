@@ -6,8 +6,17 @@ HOME="/data/data/com.termux/files/home"
 PATH="$PREFIX/bin"
 export PREFIX HOME PATH
 
+# Runtime-only credentials live outside the repository and deployment bundle.
+SECRETS_FILE="$HOME/.echo-secrets"
+if [ -r "$SECRETS_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$SECRETS_FILE"
+fi
+
 SESSION="echo"
 NAPCAT_SESSION="napcat"
+MEMORY_SESSION="memory-daily"
+MEMORY_SCRIPT="$HOME/echo-memory/scripts/memory-daily-loop.sh"
 PROOT="$PREFIX/bin/proot-distro"
 NAPCAT_SCRIPT="$HOME/phone-napcat-start.sh"
 COMMAND=(
@@ -16,6 +25,9 @@ COMMAND=(
   --work-dir /opt/echo
   ubuntu --
   /usr/bin/env TZ=Asia/Shanghai PYTHONUNBUFFERED=1
+  "ECHO_HAJIMI_API_KEY=${ECHO_HAJIMI_API_KEY:-}"
+  "ECHO_SILICONFLOW_API_KEY=${ECHO_SILICONFLOW_API_KEY:-}"
+  "ECHO_STT_MODEL=${ECHO_STT_MODEL:-FunAudioLLM/SenseVoiceSmall}"
   /opt/echo-astrbot/bin/astrbot run
 )
 NAPCAT_COMMAND=(
@@ -39,10 +51,17 @@ start_napcat() {
   fi
 }
 
+start_memory_daily() {
+  if [ -x "$MEMORY_SCRIPT" ] && ! tmux has-session -t "$MEMORY_SESSION" 2>/dev/null; then
+    tmux new-session -d -s "$MEMORY_SESSION" "$MEMORY_SCRIPT"
+  fi
+}
+
 case "${1:-status}" in
   start)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
       start_napcat
+      start_memory_daily
       echo "echo already running"
       exit 0
     fi
@@ -51,6 +70,7 @@ case "${1:-status}" in
     for _ in $(seq 1 60); do
       if curl -fsS --max-time 2 http://127.0.0.1:6185/ >/dev/null; then
         start_napcat
+        start_memory_daily
         echo "echo started: http://127.0.0.1:6185"
         exit 0
       fi
@@ -71,6 +91,11 @@ case "${1:-status}" in
       sleep 2
       tmux kill-session -t "$NAPCAT_SESSION" 2>/dev/null || true
     fi
+    if tmux has-session -t "$MEMORY_SESSION" 2>/dev/null; then
+      tmux send-keys -t "$MEMORY_SESSION" C-c
+      sleep 1
+      tmux kill-session -t "$MEMORY_SESSION" 2>/dev/null || true
+    fi
     stop_napcat_processes
     echo "echo and napcat stopped"
     ;;
@@ -86,6 +111,11 @@ case "${1:-status}" in
       echo "napcat=running"
     else
       echo "napcat=stopped"
+    fi
+    if tmux has-session -t "$MEMORY_SESSION" 2>/dev/null; then
+      echo "memory-daily=running"
+    else
+      echo "memory-daily=stopped"
     fi
     ;;
   logs)

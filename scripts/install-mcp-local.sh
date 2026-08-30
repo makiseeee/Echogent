@@ -41,6 +41,11 @@ text = path.read_text(encoding="utf-8")
 defaults = {
     "ECHO_OBSIDIAN_VAULT": "/mnt/d/wenboo",
     "ECHO_OBSIDIAN_OWNER_ID": "1249403130",
+    "ECHO_OBSIDIAN_GIT_ENABLED": "false",
+    "ECHO_OBSIDIAN_GIT_REMOTE": "gitee",
+    "ECHO_OBSIDIAN_GIT_BRANCH": "main",
+    "ECHO_OBSIDIAN_GIT_TIMEOUT": "30",
+    "ECHO_OBSIDIAN_GIT_USERNAME": "Weeenbo",
 }
 present = {line.split("=", 1)[0] for line in text.splitlines() if "=" in line}
 for key, value in defaults.items():

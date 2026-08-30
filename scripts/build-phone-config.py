@@ -36,6 +36,7 @@ def main() -> None:
     config["timezone"] = "Asia/Shanghai"
     config["default_kb_collection"] = ""
     config["kb_names"] = []
+    config["kb_agentic_mode"] = False
 
     args.output.write_text(
         json.dumps(config, ensure_ascii=False, indent=4) + "\n",

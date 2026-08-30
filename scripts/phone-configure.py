@@ -23,6 +23,12 @@ dashboard["port"] = 6185
 provider_settings = config.setdefault("provider_settings", {})
 provider_settings["computer_use_runtime"] = "none"
 
+# Keep scheduled memory/knowledge maintenance, but disable automatic RAG on
+# every chat turn. Explicit Obsidian and knowledge tools remain available.
+config["default_kb_collection"] = ""
+config["kb_names"] = []
+config["kb_agentic_mode"] = False
+
 CONFIG.write_text(
     json.dumps(config, ensure_ascii=False, indent=4) + "\n",
     encoding="utf-8",

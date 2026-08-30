@@ -41,7 +41,10 @@ provider_config = {
     "model": "deepseek-ai/DeepSeek-V4-Flash",
     "provider_source_id": "siliconflow_source",
     "modalities": [],
-    "custom_extra_body": {},
+    # DeepSeek V4 Flash: keep ordinary QQ chat fast and concise.
+    # Tool calls remain available; this only disables the model's visible/extended
+    # reasoning mode for the default provider.
+    "custom_extra_body": {"enable_thinking": False},
 }
 if provider is None:
     providers.insert(0, provider_config)

@@ -27,7 +27,7 @@
   -> 手机 Linux QQ / NapCat
   -> OneBot 反向 WebSocket 127.0.0.1:6199
   -> 手机 AstrBot
-  -> SiliconFlow DeepSeek V4 Flash 生成回复
+  -> Hajimi Responses API / deepseek-v4-flash 生成回复
   -> NapCat 发回 QQ
 ```
 

@@ -29,6 +29,7 @@ from starlette.responses import JSONResponse
 from obsidian_access import AccessMode, VaultAccessPolicy
 from obsidian_search import list_notes, read_note_excerpt, search_vault
 from obsidian_write import NoteWriteService
+from daily_task_manager import DailyTaskManager, TaskAmbiguityError
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -41,6 +42,7 @@ MAX_TIMEOUT_SECONDS = 10
 MEMORY_LIMIT_BYTES = 256 * 1024 * 1024
 OBSIDIAN_MAX_RESULTS = 20
 _OBSIDIAN_WRITE_SERVICE: NoteWriteService | None = None
+_DAILY_TASK_MANAGER: DailyTaskManager | None = None
 
 
 def _allowed_roots() -> tuple[Path, ...]:
@@ -83,8 +85,36 @@ def _obsidian_writer() -> NoteWriteService:
     global _OBSIDIAN_WRITE_SERVICE
     if _OBSIDIAN_WRITE_SERVICE is None:
         audit_path = os.environ.get("ECHO_OBSIDIAN_AUDIT_DB", str(BASE_DIR / "obsidian-write-audit.db"))
-        _OBSIDIAN_WRITE_SERVICE = NoteWriteService(_obsidian_policy(), audit_path)
+        policy = _obsidian_policy()
+        git_sync = None
+        if os.environ.get("ECHO_OBSIDIAN_GIT_ENABLED", "").strip().lower() in {"1", "true", "yes"}:
+            from obsidian_git import VaultGitSync
+            git_sync = VaultGitSync(
+                policy.root,
+                remote=os.environ.get("ECHO_OBSIDIAN_GIT_REMOTE", "origin"),
+                branch=os.environ.get("ECHO_OBSIDIAN_GIT_BRANCH", "main"),
+                timeout_seconds=int(os.environ.get("ECHO_OBSIDIAN_GIT_TIMEOUT", "30")),
+                username=os.environ.get("ECHO_OBSIDIAN_GIT_USERNAME", ""),
+                token=os.environ.get("ECHO_OBSIDIAN_GIT_TOKEN", ""),
+            )
+        _OBSIDIAN_WRITE_SERVICE = NoteWriteService(policy, audit_path, git_sync)
     return _OBSIDIAN_WRITE_SERVICE
+
+
+def _obsidian_pull_latest() -> None:
+    writer = _obsidian_writer()
+    if writer.git_sync:
+        writer.git_sync.pull_latest()
+
+
+def _daily_tasks() -> DailyTaskManager:
+    global _DAILY_TASK_MANAGER
+    if _DAILY_TASK_MANAGER is None:
+        writer = _obsidian_writer()
+        if writer.git_sync is None:
+            raise RuntimeError("日常任务管理需要启用 Obsidian Git 同步")
+        _DAILY_TASK_MANAGER = DailyTaskManager(writer.git_sync)
+    return _DAILY_TASK_MANAGER
 
 
 def _obsidian_mode(scope: str) -> AccessMode:
@@ -288,6 +318,8 @@ async def obsidian_api(request: Request) -> JSONResponse:
         action = str(body.get("action", ""))
         mode = _obsidian_mode(str(body.get("scope", "standard")))
         policy = _obsidian_policy()
+        if action in {"search", "list", "read", "prepare_create", "prepare_link"}:
+            _obsidian_pull_latest()
         if action == "search":
             value = [
                 result.__dict__
@@ -355,11 +387,52 @@ async def obsidian_api(request: Request) -> JSONResponse:
                 request.headers.get("x-echo-user-id", ""), str(body.get("operation_id", ""))
             )
             value = {"cancelled": operation.path}
+        elif action == "daily_add_task":
+            value = {
+                "task_id": _daily_tasks().ingest_task(
+                    str(body.get("name", "")),
+                    str(body.get("ddl", "")).strip() or None,
+                    str(body.get("remarks", "")),
+                    bool(body.get("is_recurring", False)),
+                    str(body.get("cycle_rule", "")),
+                )
+            }
+        elif action == "daily_dispatch":
+            value = _daily_tasks().morning_dispatch(
+                str(body.get("date", "")).strip() or None,
+                int(body.get("max_tasks", 3)),
+            )
+        elif action == "daily_toggle":
+            value = {
+                "changed": _daily_tasks().toggle_daily_task(
+                    str(body.get("keyword", "")),
+                    bool(body.get("completed", True)),
+                    str(body.get("date", "")).strip() or None,
+                )
+            }
+        elif action == "daily_thino":
+            _daily_tasks().append_thino(
+                str(body.get("content", "")),
+                str(body.get("date", "")).strip() or None,
+            )
+            value = {"appended": True}
+        elif action == "daily_recap":
+            value = _daily_tasks().evening_recap_and_requeue(
+                str(body.get("date", "")).strip() or None,
+                str(body.get("reflection", "")),
+                body.get("progress_notes") or {},
+            )
         else:
             raise ValueError("未知的 Obsidian 操作")
         return JSONResponse({"ok": True, "result": value})
+    except TaskAmbiguityError as exc:
+        return JSONResponse(
+            {"ok": False, "error": str(exc), "matches": [task.__dict__ for task in exc.matches]},
+            status_code=409,
+        )
     except (OSError, PermissionError, ValueError, RuntimeError) as exc:
-        return JSONResponse({"ok": False, "error": str(exc)}, status_code=403)
+        status = 403 if isinstance(exc, PermissionError) else 400
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
 
 
 async def status_api(request: Request) -> JSONResponse:
@@ -367,7 +440,7 @@ async def status_api(request: Request) -> JSONResponse:
         "online": True,
         "service": "echo-executor",
         "hostname": socket.gethostname(),
-        "capabilities": ["python_sandbox", "workspace_read", "obsidian_read", "obsidian_write"],
+        "capabilities": ["python_sandbox", "workspace_read", "obsidian_read", "obsidian_write", "daily_tasks"],
         "time_utc": datetime.now(UTC).isoformat(),
     }
     return JSONResponse(payload)

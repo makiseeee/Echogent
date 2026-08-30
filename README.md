@@ -8,7 +8,7 @@
 QQ
   -> 手机 NapCat / OneBot v11
   -> 手机 AstrBot
-       -> SiliconFlow DeepSeek V4 Flash：主对话模型
+       -> Hajimi Responses API / deepseek-v4-flash：主对话模型
        -> self_evolution：记忆、画像、每日总结
        -> echo-tools：搜索、网页抓取、计算器
        -> kaomoji：颜文字反应

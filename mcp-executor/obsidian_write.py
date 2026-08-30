@@ -12,6 +12,7 @@ import sqlite3
 import threading
 
 from obsidian_access import AccessMode, VaultAccessPolicy
+from obsidian_git import VaultGitSync
 
 MAX_NOTE_CHARS = 20_000
 MAX_LINKS = 20
@@ -41,12 +42,13 @@ class PendingLink:
 
 
 class NoteWriteService:
-    def __init__(self, policy: VaultAccessPolicy, audit_path: Path | str | None = None):
+    def __init__(self, policy: VaultAccessPolicy, audit_path: Path | str | None = None, git_sync: VaultGitSync | None = None):
         self.policy = policy
         self._pending: dict[str, PendingNote] = {}
         self._pending_links: dict[str, PendingLink] = {}
         self._lock = threading.Lock()
         self.audit_path = Path(audit_path) if audit_path else None
+        self.git_sync = git_sync
         if self.audit_path:
             self.audit_path.parent.mkdir(parents=True, exist_ok=True)
             with sqlite3.connect(self.audit_path) as db:
@@ -99,6 +101,15 @@ class NoteWriteService:
         return operation
 
     def commit(self, owner_id: str, operation_id: str) -> PendingNote:
+        if self.git_sync:
+            operation, _ = self.git_sync.atomic_write(
+                lambda: self._commit_local(owner_id, operation_id),
+                "create Obsidian note",
+            )
+            return operation
+        return self._commit_local(owner_id, operation_id)
+
+    def _commit_local(self, owner_id: str, operation_id: str) -> PendingNote:
         with self._lock:
             self._purge_expired()
             operation = self._pending.get(operation_id)
@@ -159,6 +170,15 @@ class NoteWriteService:
         return operation
 
     def commit_link(self, owner_id: str, operation_id: str) -> PendingLink:
+        if self.git_sync:
+            operation, _ = self.git_sync.atomic_write(
+                lambda: self._commit_link_local(owner_id, operation_id),
+                "link Obsidian notes",
+            )
+            return operation
+        return self._commit_link_local(owner_id, operation_id)
+
+    def _commit_link_local(self, owner_id: str, operation_id: str) -> PendingLink:
         with self._lock:
             self._purge_expired()
             operation = self._pending_links.get(operation_id)
