@@ -80,43 +80,31 @@ class TestModelCommand(unittest.IsolatedAsyncioTestCase):
             results = [r async for r in plugin.model_command(event)]
             self.assertEqual(len(results), 1)
             menu_text = results[0]
-            self.assertIn("当前云端实时可用模型列表", menu_text)
+            self.assertIn("Go 计划当前可用大模型列表", menu_text)
             self.assertIn("[2] deepseek/deepseek-v4-flash (当前使用 🌟)", menu_text)
-            self.assertIn("[3] z-ai/glm-5.3-flash", menu_text)
+            self.assertIn("[8] z-ai/glm-5.3-flash", menu_text)
 
-        # 2. Test switching by index: /模型 3
-        event.message_str = "/模型 3"
-        with patch("aiohttp.ClientSession.get") as mock_get:
-            mock_resp = AsyncMock()
-            mock_resp.status = 200
-            mock_resp.json = AsyncMock(return_value=mock_models_response)
-            mock_get.return_value.__aenter__.return_value = mock_resp
+        # 2. Test switching by index: /模型 8
+        event.message_str = "/模型 8"
+        results = [r async for r in plugin.model_command(event)]
+        self.assertEqual(len(results), 1)
+        self.assertIn("z-ai/glm-5.3-flash", results[0])
+        self.assertIn("即刻生效", results[0])
+        mock_inst.set_model.assert_called_with("z-ai/glm-5.3-flash")
 
-            results = [r async for r in plugin.model_command(event)]
-            self.assertEqual(len(results), 1)
-            self.assertIn("z-ai/glm-5.3-flash", results[0])
-            self.assertIn("即刻生效", results[0])
-            mock_inst.set_model.assert_called_with("z-ai/glm-5.3-flash")
-
-            # Verify persisted to disk
-            saved_cfg = json.loads(self.cfg_file.read_text(encoding="utf-8"))
-            self.assertEqual(saved_cfg["provider"][0]["model"], "z-ai/glm-5.3-flash")
+        # Verify persisted to disk
+        saved_cfg = json.loads(self.cfg_file.read_text(encoding="utf-8"))
+        self.assertEqual(saved_cfg["provider"][0]["model"], "z-ai/glm-5.3-flash")
 
         # 3. Test switching by keyword: /模型 qwen
         event.message_str = "/模型 qwen"
-        with patch("aiohttp.ClientSession.get") as mock_get:
-            mock_resp = AsyncMock()
-            mock_resp.status = 200
-            mock_resp.json = AsyncMock(return_value=mock_models_response)
-            mock_get.return_value.__aenter__.return_value = mock_resp
+        results = [r async for r in plugin.model_command(event)]
+        self.assertEqual(len(results), 1)
+        self.assertIn("Qwen/Qwen3.8-Max", results[0])
+        mock_inst.set_model.assert_called_with("Qwen/Qwen3.8-Max")
 
-            results = [r async for r in plugin.model_command(event)]
-            self.assertEqual(len(results), 1)
-            self.assertIn("Qwen/Qwen3.7-Max", results[0])
-            mock_inst.set_model.assert_called_with("Qwen/Qwen3.7-Max")
-
-            saved_cfg = json.loads(self.cfg_file.read_text(encoding="utf-8"))
-            self.assertEqual(saved_cfg["provider"][0]["model"], "Qwen/Qwen3.7-Max")
+        saved_cfg = json.loads(self.cfg_file.read_text(encoding="utf-8"))
+        self.assertEqual(saved_cfg["provider"][0]["model"], "Qwen/Qwen3.8-Max")
 
 
 if __name__ == "__main__":
