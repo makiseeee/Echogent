@@ -43,3 +43,5 @@ mcp-executor/workspace/*
 # 系统
 .DS_Store
 Thumbs.db
+data/
+*.db
