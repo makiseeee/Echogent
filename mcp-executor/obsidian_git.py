@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import threading
+import time
 from typing import Callable, TypeVar
 
 
@@ -50,6 +51,8 @@ class VaultGitSync:
         self.username = username
         self.token = token
         self._lock = threading.Lock()
+        self._last_pull_time: float = 0.0
+        self._pull_cache_ttl: float = 60.0
 
     def _git(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
@@ -81,9 +84,13 @@ class VaultGitSync:
         if (marker / "rebase-merge").exists() or (marker / "rebase-apply").exists():
             self._git("rebase", "--abort", check=False)
 
-    def _pull_unlocked(self) -> tuple[bool, str]:
+    def _pull_unlocked(self, force: bool = False) -> tuple[bool, str]:
+        now = time.time()
+        if not force and (now - self._last_pull_time < self._pull_cache_ttl):
+            return True, ""
         try:
             self._git("pull", "--rebase", self.remote, self.branch)
+            self._last_pull_time = time.time()
             return True, ""
         except (subprocess.SubprocessError, OSError) as exc:
             self._abort_rebase()
@@ -91,9 +98,20 @@ class VaultGitSync:
             LOG.warning("Obsidian git pull failed; continuing offline: %s", warning)
             return False, warning
 
-    def pull_latest(self) -> GitSyncResult:
+    def pull_if_stale(self, max_age_sec: float = 30.0) -> GitSyncResult:
+        """若距离上次 pull 超过 max_age_sec 秒则执行拉取，否则复用避免频繁网络等待。"""
         with self._lock:
-            ok, warning = self._pull_unlocked()
+            now = time.time()
+            if (now - self._last_pull_time) < max_age_sec:
+                return GitSyncResult(success=True, pull_warning="")
+            ok, warning = self._pull_unlocked(force=True)
+            return GitSyncResult(success=ok, pull_warning=warning, error="" if ok else warning)
+
+    def pull_latest(self, force: bool = True) -> GitSyncResult:
+        if not force:
+            return self.pull_if_stale(self._pull_cache_ttl)
+        with self._lock:
+            ok, warning = self._pull_unlocked(force=True)
             return GitSyncResult(success=ok, pull_warning=warning, error="" if ok else warning)
 
     def atomic_write(self, action_func: Callable[[], T], commit_message: str) -> tuple[T, GitSyncResult]:

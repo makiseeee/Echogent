@@ -9,6 +9,7 @@ from typing import Any
 
 import aiohttp
 from core.compat import AstrMessageEvent, ProviderRequest, logger
+from core.http_client import HttpClient
 
 
 class VoiceTranscriber:
@@ -35,15 +36,16 @@ class VoiceTranscriber:
             form.add_field("file", audio_file, filename=path.name, content_type="application/octet-stream")
             form.add_field("model", os.environ.get("ECHO_STT_MODEL", "FunAudioLLM/SenseVoiceSmall"))
             timeout = aiohttp.ClientTimeout(total=float(os.environ.get("ECHO_STT_TIMEOUT", "90")))
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(
-                    "https://api.siliconflow.cn/v1/audio/transcriptions",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    data=form,
-                ) as resp:
-                    body = await resp.text()
-                    if resp.status != 200:
-                        raise RuntimeError(f"SenseVoice 请求失败（HTTP {resp.status}）：{body[:200]}")
+            session = await HttpClient.get_session()
+            async with session.post(
+                "https://api.siliconflow.cn/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                data=form,
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                if resp.status != 200:
+                    raise RuntimeError(f"SenseVoice 请求失败（HTTP {resp.status}）：{body[:200]}")
         finally:
             audio_file.close()
 

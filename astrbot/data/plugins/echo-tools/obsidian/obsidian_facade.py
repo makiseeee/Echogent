@@ -69,7 +69,7 @@ class ObsidianFacade:
             policy = service.policy
             action = payload.get("action")
             if action in {"search", "list", "read", "prepare_create", "prepare_link"} and service.git_sync:
-                service.git_sync.pull_latest()
+                service.git_sync.pull_if_stale(30.0)
 
             target_path = str(payload.get("path") or "")
             scope_val = payload.get("scope") or "standard"

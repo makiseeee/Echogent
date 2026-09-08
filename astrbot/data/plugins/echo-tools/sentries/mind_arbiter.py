@@ -9,6 +9,7 @@ from typing import Any
 
 import aiohttp
 from core.compat import Context, logger
+from core.http_client import HttpClient
 
 from sentries.battery_sentry import BatterySentry
 from sentries.pc_prober import PCProber
@@ -28,12 +29,12 @@ class MindArbiter:
     async def check_ambient_dark() -> bool:
         """检测宿舍是否熄灯断光（<5 Lux），若熄灯则静默睡眠，绝不打扰。"""
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=1.0)) as session:
-                async with session.get("http://127.0.0.1:8099/ambient_state.json") as resp:
-                    if resp.status == 200:
-                        data = await resp.json(content_type=None)
-                        if isinstance(data, dict):
-                            return bool(data.get("is_dark")) or float(data.get("lux", 100)) < 5.0
+            session = await HttpClient.get_session()
+            async with session.get("http://127.0.0.1:8099/ambient_state.json", timeout=aiohttp.ClientTimeout(total=1.0)) as resp:
+                if resp.status == 200:
+                    data = await resp.json(content_type=None)
+                    if isinstance(data, dict):
+                        return bool(data.get("is_dark")) or float(data.get("lux", 100)) < 5.0
         except Exception:
             pass
         return False

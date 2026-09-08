@@ -30,6 +30,7 @@ from core.compat import (
 # 子模块导入
 from core.config import PluginConfig
 from core.cron_scheduler import CronScheduler
+from core.http_client import HttpClient
 from core.persona_compiler import PersonaCompiler
 from core.token_interceptor import TokenInterceptor
 from obsidian.obsidian_facade import ObsidianFacade
@@ -89,6 +90,7 @@ class EchoTools(Star):
         """插件优雅停机：取消所有后台异步守护与释放连接池。"""
         await self.sentries.stop_all()
         await self.web_fetcher.close()
+        await HttpClient.close()
 
     # ==========================================
     # 指令处理层 (Commands)

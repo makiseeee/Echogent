@@ -12,6 +12,14 @@ MAX_RESULTS = 20
 MAX_CONTEXT_CHARS = 240
 MAX_READ_CHARS = 4_000
 
+# 内存缓存：abs_path -> (mtime, title, text, text_casefold)
+_SEARCH_CACHE: dict[str, tuple[float, str, str, str]] = {}
+
+
+def clear_search_cache() -> None:
+    """清理内存中的笔记搜索缓存。"""
+    _SEARCH_CACHE.clear()
+
 
 @dataclass(frozen=True)
 class SearchResult:
@@ -34,6 +42,21 @@ def _context(text: str, query: str) -> str:
         return compact[:MAX_CONTEXT_CHARS]
     start = max(0, match.start() - 80)
     return compact[start : start + MAX_CONTEXT_CHARS]
+
+
+def _get_note_content(path: Path, stat_result: Any = None) -> tuple[str, str, str]:
+    """获取笔记的 title, raw_text, text_casefold，优先命中 mtime 缓存。"""
+    abs_key = str(path.resolve())
+    mtime = stat_result.st_mtime if stat_result else path.stat().st_mtime
+    cached = _SEARCH_CACHE.get(abs_key)
+    if cached is not None and cached[0] == mtime:
+        return cached[1], cached[2], cached[3]
+
+    text = path.read_text(encoding="utf-8", errors="replace")
+    title = _title(path, text)
+    text_casefold = text.casefold()
+    _SEARCH_CACHE[abs_key] = (mtime, title, text, text_casefold)
+    return title, text, text_casefold
 
 
 def search_vault(
@@ -63,13 +86,13 @@ def search_vault(
         for path in sorted(root.rglob("*.md")):
             try:
                 allowed = policy.resolve_markdown(path, mode)
-                text = path.read_text(encoding="utf-8", errors="replace")
+                stat_result = path.stat()
+                title, text, text_casefold = _get_note_content(path, stat_result)
             except (OSError, PermissionError, ValueError):
                 continue
-            title = _title(path, text)
+
             relative = allowed.relative.as_posix()
-            haystack = f"{relative}\n{title}\n{text}".casefold()
-            if needle in haystack:
+            if needle in relative.casefold() or needle in title.casefold() or needle in text_casefold:
                 results.append(SearchResult(relative, title, _context(text, query)))
                 if len(results) >= limit:
                     return results
@@ -106,7 +129,7 @@ def read_note_excerpt(
 ) -> SearchResult:
     """Read only a bounded excerpt, never an unrestricted full note."""
     note = policy.resolve_markdown(path, mode)
-    text = note.absolute.read_text(encoding="utf-8", errors="replace")
+    title, text, _ = _get_note_content(note.absolute)
     max_chars = max(200, min(int(max_chars), MAX_READ_CHARS))
     context = _context(text, query) if query.strip() else text[:max_chars]
-    return SearchResult(note.relative.as_posix(), _title(note.absolute, text), context[:max_chars])
+    return SearchResult(note.relative.as_posix(), title, context[:max_chars])

@@ -11,6 +11,7 @@ import aiohttp
 from core.compat import ProviderRequest, logger
 
 from core.config import PluginConfig
+from core.http_client import HttpClient
 
 
 class PCProber:
@@ -32,18 +33,18 @@ class PCProber:
         headers = {"Authorization": f"Bearer {token}"} if token else {}
 
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_sec)) as session:
-                async with session.get(pc_agent_url, headers=headers) as resp:
-                    if resp.status == 200:
-                        payload = await resp.json(content_type=None)
-                        if isinstance(payload, dict) and (payload.get("status") == "online" or bool(payload.get("app"))):
-                            self.online = True
-                            self.activity = payload
-                            self.last_probe_ts = time.time()
-                            app = payload.get("app", "")
-                            summary = payload.get("summary", "")
-                            self.detail = f"{app} ({summary})"
-                            return True, self.detail
+            session = await HttpClient.get_session()
+            async with session.get(pc_agent_url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout_sec)) as resp:
+                if resp.status == 200:
+                    payload = await resp.json(content_type=None)
+                    if isinstance(payload, dict) and (payload.get("status") == "online" or bool(payload.get("app"))):
+                        self.online = True
+                        self.activity = payload
+                        self.last_probe_ts = time.time()
+                        app = payload.get("app", "")
+                        summary = payload.get("summary", "")
+                        self.detail = f"{app} ({summary})"
+                        return True, self.detail
         except Exception as exc:
             logger.debug(f"[PCProber] 探测 PC Agent 异常: {exc}")
 
@@ -51,9 +52,9 @@ class PCProber:
         try:
             url, authorization = self.config.get_obsidian_connection()
             url = url.replace("/obsidian", "/status")
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_sec)) as session:
-                async with session.get(url, headers={"Authorization": authorization}) as resp:
-                    payload = await resp.json(content_type=None)
+            session = await HttpClient.get_session()
+            async with session.get(url, headers={"Authorization": authorization}, timeout=aiohttp.ClientTimeout(total=timeout_sec)) as resp:
+                payload = await resp.json(content_type=None)
             mcp_online = resp.status == 200 and bool(payload.get("online"))
             caps = payload.get("capabilities", [])
             mcp_detail = "、".join(caps) if mcp_online else ""

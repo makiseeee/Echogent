@@ -35,6 +35,7 @@ class PluginConfig:
         self.git_timeout = int(os.environ.get("ECHO_OBSIDIAN_GIT_TIMEOUT", "30"))
         self.git_username = os.environ.get("ECHO_OBSIDIAN_GIT_USERNAME", "")
         self.git_token = os.environ.get("ECHO_OBSIDIAN_GIT_TOKEN", "")
+        self._owner_ids_cache: tuple[Path, float, set[str]] | None = None
 
     def find_data_file(self, name: str) -> Path:
         """从候选目录解析指定 AstrBot 数据文件（如 cmd_config.json, mcp_server.json）。"""
@@ -46,11 +47,21 @@ class PluginConfig:
         raise RuntimeError(f"找不到 AstrBot 配置文件：{name}")
 
     def get_owner_ids(self) -> set[str]:
-        """读取管理员 QQ ID 列表。"""
+        """读取管理员 QQ ID 列表（带有 mtime 缓存）。"""
         try:
             cfg_file = self.find_data_file("cmd_config.json")
+            mtime = cfg_file.stat().st_mtime
+            if (
+                self._owner_ids_cache is not None
+                and self._owner_ids_cache[0] == cfg_file
+                and self._owner_ids_cache[1] == mtime
+            ):
+                return self._owner_ids_cache[2]
+
             data = json.loads(cfg_file.read_text(encoding="utf-8"))
-            return {str(val) for val in data.get("admins_id", []) if str(val)}
+            admins = {str(val) for val in data.get("admins_id", []) if str(val)}
+            self._owner_ids_cache = (cfg_file, mtime, admins)
+            return admins
         except Exception as exc:
             logger.warning(f"[EchoTools.Config] 读取管理员 ID 失败: {exc}")
             return set()

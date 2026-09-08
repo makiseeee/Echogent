@@ -98,7 +98,18 @@ class VaultGitSync:
             LOG.warning("Obsidian git pull failed; continuing offline: %s", warning)
             return False, warning
 
-    def pull_latest(self) -> GitSyncResult:
+    def pull_if_stale(self, max_age_sec: float = 30.0) -> GitSyncResult:
+        """若距离上次 pull 超过 max_age_sec 秒则执行拉取，否则复用避免频繁网络等待。"""
+        with self._lock:
+            now = time.time()
+            if (now - self._last_pull_time) < max_age_sec:
+                return GitSyncResult(success=True, pull_warning="")
+            ok, warning = self._pull_unlocked(force=True)
+            return GitSyncResult(success=ok, pull_warning=warning, error="" if ok else warning)
+
+    def pull_latest(self, force: bool = True) -> GitSyncResult:
+        if not force:
+            return self.pull_if_stale(self._pull_cache_ttl)
         with self._lock:
             ok, warning = self._pull_unlocked(force=True)
             return GitSyncResult(success=ok, pull_warning=warning, error="" if ok else warning)

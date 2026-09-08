@@ -362,7 +362,7 @@ class DailyTaskManager:
 
     def list_inventory(self) -> dict:
         """Return warehouse tasks without modifying the vault."""
-        self.git_sync.pull_latest()
+        self.git_sync.pull_if_stale(30.0)
         text = self._ensure_tasks_text()
         one_time = self._tasks_in_section(text, ONE_TIME_HEADING)
         recurring = self._tasks_in_section(text, RECURRING_HEADING)

@@ -11,6 +11,7 @@ from typing import Any
 
 import aiohttp
 from core.compat import AstrMessageEvent, logger
+from core.http_client import HttpClient
 
 
 class CompanionHUD:
@@ -25,11 +26,12 @@ class CompanionHUD:
         if len(clean_text) > 85:
             clean_text = clean_text[:82] + "..."
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=1.0)) as session:
-                await session.post(
-                    cls.HUD_API_URL,
-                    json={"text": clean_text, "motion": motion},
-                )
+            session = await HttpClient.get_session()
+            await session.post(
+                cls.HUD_API_URL,
+                json={"text": clean_text, "motion": motion},
+                timeout=aiohttp.ClientTimeout(total=1.0),
+            )
         except Exception as exc:
             logger.debug(f"[CompanionHUD] 推送伴侣屏幕气泡失败: {exc}")
 

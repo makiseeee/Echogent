@@ -11,6 +11,7 @@ from typing import Any
 
 import aiohttp
 from core.compat import logger
+from core.http_client import HttpClient
 from lxml import html as lxml_html
 
 
@@ -106,20 +107,15 @@ class WebFetcher:
     """提供网页内容抓取与 Bing 搜索解析服务（带连接池复用与 SSRF 安全拦截）。"""
 
     def __init__(self) -> None:
-        self._session: aiohttp.ClientSession | None = None
+        pass
 
     async def get_session(self) -> aiohttp.ClientSession:
         """获取或初始化复用的 ClientSession 连接池。"""
-        if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(limit=10, limit_per_host=3, ttl_dns_cache=300)
-            self._session = aiohttp.ClientSession(connector=connector)
-        return self._session
+        return await HttpClient.get_session()
 
     async def close(self) -> None:
         """优雅关闭 ClientSession 连接池。"""
-        if self._session and not self._session.closed:
-            await self._session.close()
-            self._session = None
+        await HttpClient.close()
 
     async def web_search(self, query: str) -> str:
         """搜索互联网获取最新信息。"""
