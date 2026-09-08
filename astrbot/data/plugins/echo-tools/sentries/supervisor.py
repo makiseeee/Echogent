@@ -60,7 +60,7 @@ class SentrySupervisor:
     async def start_all(self) -> None:
         """启动所有后台哨兵任务。"""
         # 1. 导出当前桌面待办
-        CompanionHUD.export_companion_tasks(self.config.vault_dir)
+        await CompanionHUD.export_companion_tasks_async(self.config.vault_dir)
 
         # 2. 启动 PC 探针
         if self.pc_task is None or self.pc_task.done():

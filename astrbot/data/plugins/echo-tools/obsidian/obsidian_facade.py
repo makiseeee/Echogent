@@ -182,7 +182,7 @@ class ObsidianFacade:
                 return "日常任务失败：未知操作"
 
             # 每次任务变动后自动同步导出伴侣屏任务
-            CompanionHUD.export_companion_tasks(self.config.vault_dir)
+            await CompanionHUD.export_companion_tasks_async(self.config.vault_dir)
             return json.dumps(value, ensure_ascii=False)
         except TaskAmbiguityError as exc:
             return json.dumps({"error": str(exc), "matches": [task.__dict__ for task in exc.matches]}, ensure_ascii=False)

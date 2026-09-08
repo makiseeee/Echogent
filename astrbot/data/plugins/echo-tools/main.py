@@ -86,8 +86,9 @@ class EchoTools(Star):
             logger.exception("[EchoTools] 注册每日主动定时任务异常")
 
     async def terminate(self) -> None:
-        """插件优雅停机：取消所有后台异步守护。"""
+        """插件优雅停机：取消所有后台异步守护与释放连接池。"""
         await self.sentries.stop_all()
+        await self.web_fetcher.close()
 
     # ==========================================
     # 指令处理层 (Commands)
@@ -96,7 +97,8 @@ class EchoTools(Star):
     @filter.command("用量")
     async def usage_command(self, event: AstrMessageEvent):
         """查询本地记录的 Token 用量：/用量、/用量 今日、/用量 本月、/用量 全部。"""
-        yield event.plain_result(self.usage_reporter.get_report(str(event.message_str or "")))
+        report = await self.usage_reporter.get_report_async(str(event.message_str or ""))
+        yield event.plain_result(report)
 
     @filter.command("模型")
     async def model_command(self, event: AstrMessageEvent):

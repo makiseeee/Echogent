@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import sqlite3
+from typing import Any
 
 
 class UsageReporter:
@@ -19,24 +21,25 @@ class UsageReporter:
         if period not in {"今日", "本月", "全部"}:
             return "用法：/用量、/用量 今日、/用量 本月或 /用量 全部"
 
-        where = "1=1"
-        args: list[str] = []
+        conditions = ["1=1"]
+        params: list[Any] = []
         if period == "今日":
-            where += " AND created_at >= date('now','localtime')"
+            conditions.append("created_at >= date('now', 'localtime')")
         elif period == "本月":
-            where += " AND created_at >= strftime('%Y-%m-01','now','localtime')"
+            conditions.append("created_at >= strftime('%Y-%m-01', 'now', 'localtime')")
 
         if not self.db_path.exists():
             return "暂无 Token 消耗数据记录。"
 
+        query = (
+            "SELECT COUNT(*), COALESCE(SUM(input_other),0), COALESCE(SUM(input_cached),0), "
+            "COALESCE(SUM(output),0), COALESCE(SUM(total),0), COALESCE(SUM(estimated_cost_usd),0) "
+            f"FROM usage WHERE {' AND '.join(conditions)}"
+        )
+
         try:
             with sqlite3.connect(self.db_path, timeout=5.0) as db:
-                row = db.execute(
-                    f"SELECT COUNT(*), COALESCE(SUM(input_other),0), COALESCE(SUM(input_cached),0), "
-                    f"COALESCE(SUM(output),0), COALESCE(SUM(total),0), COALESCE(SUM(estimated_cost_usd),0) "
-                    f"FROM usage WHERE {where}",
-                    args,
-                ).fetchone()
+                row = db.execute(query, params).fetchone()
         except sqlite3.OperationalError:
             return "暂无 Token 消耗数据记录。"
 
@@ -55,3 +58,7 @@ class UsageReporter:
             f"• API 物理请求：{count} 次\n"
             f"• 预估账单计费：${cost_usd:.5f} USD"
         )
+
+    async def get_report_async(self, message_str: str) -> str:
+        """异步非阻塞执行 Token 账单查询，防止事件循环卡顿。"""
+        return await asyncio.to_thread(self.get_report, message_str)

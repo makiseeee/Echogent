@@ -1,4 +1,6 @@
+import hmac
 import json
+import os
 import urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import threading
@@ -164,14 +166,43 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 """
 
 class EchoRequestHandler(BaseHTTPRequestHandler):
+    def _apply_cors(self):
+        origin = self.headers.get("Origin", "")
+        if origin:
+            # 仅允许本地与指定网段的 Origin，杜绝公网任意第三方网页跨域窥探活动
+            allowed = any(kw in origin for kw in ("localhost", "127.0.0.1", "10.144.", "192.168."))
+            if allowed:
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+
+    def _is_authenticated(self) -> bool:
+        expected = os.environ.get("ECHO_PC_TOKEN", "").strip()
+        if not expected:
+            return True  # 未设置 Token 时兼容放行
+        auth_header = self.headers.get("Authorization", "").strip()
+        if hmac.compare_digest(auth_header, f"Bearer {expected}"):
+            return True
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        token_param = qs.get("token", [""])[0]
+        if token_param and hmac.compare_digest(token_param, expected):
+            return True
+        return False
+
     def _send_json(self, data: dict, status: int = 200):
         body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._apply_cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._apply_cors()
+        self.end_headers()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -182,6 +213,7 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            self._apply_cors()
             self.end_headers()
             self.wfile.write(body)
             return
@@ -192,6 +224,9 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
 
         try:
             if path == "/api/pc/activity":
+                if not self._is_authenticated():
+                    self._send_json({"error": "Unauthorized", "detail": "Valid Bearer token required"}, status=401)
+                    return
                 params = urllib.parse.parse_qs(parsed.query)
                 level = params.get("level", ["summary"])[0]
                 report = tracker.get_report(level=level)
@@ -207,6 +242,9 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         if path == "/api/pc/privacy/toggle":
+            if not self._is_authenticated():
+                self._send_json({"error": "Unauthorized", "detail": "Valid Bearer token required"}, status=401)
+                return
             tracker.privacy_mode = not tracker.privacy_mode
             self._send_json({"status": "ok", "privacy_mode": tracker.privacy_mode})
             return
@@ -218,10 +256,10 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
         pass
 
 class AgentServer:
-    def __init__(self, host: str = "0.0.0.0", port: int = 8766):
-        self.host = host
-        self.port = port
-        self.server: Optional[HTTPServer] = None
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+        self.host = host or os.environ.get("ECHO_PC_HOST", "0.0.0.0")
+        self.port = port or int(os.environ.get("ECHO_PC_PORT", "8766"))
+        self.server: Optional[ThreadingHTTPServer] = None
         self.thread: Optional[threading.Thread] = None
 
     def start(self):

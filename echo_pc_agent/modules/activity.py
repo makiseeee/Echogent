@@ -63,6 +63,8 @@ class ActivityTracker:
         self.current_session_start = time.time()
         self.current_app = ""
         self.privacy_mode = False
+        self._last_poll_time = 0.0
+        self._cached_activity: Dict[str, Any] = {}
 
     def _ensure_desktop(self):
         try:
@@ -240,12 +242,15 @@ class ActivityTracker:
                 "hwnd": 0,
             }
 
+        now = time.time()
+        if (now - self._last_poll_time < 1.0) and self._cached_activity:
+            return dict(self._cached_activity)
+
         raw = self.get_raw_foreground_window()
         idle = self.get_system_idle_seconds()
         sanitized_title = self.sanitize_title(raw["title"])
         res = self.classify(raw["process_name"], sanitized_title, idle)
         
-        now = time.time()
         current_identity = f"{res['category']}:{res['app_name']}"
         if current_identity != self.current_app:
             self.current_app = current_identity
@@ -264,6 +269,8 @@ class ActivityTracker:
             "app": res["app_name"],
         })
 
+        self._last_poll_time = now
+        self._cached_activity = dict(res)
         return res
 
     def get_macro_summary(self) -> Dict[str, Any]:

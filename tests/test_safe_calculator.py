@@ -39,3 +39,24 @@ class TestSafeCalculator(unittest.TestCase):
     def test_evaluate_string_output(self):
         self.assertEqual(SafeCalculator.evaluate("10 + 5"), "10 + 5 = 15")
         self.assertTrue(SafeCalculator.evaluate("1/0").startswith("计算失败"))
+
+    def test_dos_preventions(self):
+        # 9**9**9 should be blocked
+        with self.assertRaises(ValueError):
+            SafeCalculator.safe_eval("9**9**9")
+
+        # Exponent > 1000
+        with self.assertRaises(ValueError):
+            SafeCalculator.safe_eval("2**1001")
+
+        # Factorial > 100
+        with self.assertRaises(ValueError):
+            SafeCalculator.safe_eval("factorial(1000)")
+
+        # Factorial negative
+        with self.assertRaises(ValueError):
+            SafeCalculator.safe_eval("factorial(-5)")
+
+        # Normal factorial and power succeed
+        self.assertEqual(SafeCalculator.safe_eval("factorial(5)"), 120)
+        self.assertEqual(SafeCalculator.safe_eval("2**10"), 1024)

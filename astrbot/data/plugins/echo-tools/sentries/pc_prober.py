@@ -24,11 +24,16 @@ class PCProber:
         self.last_probe_ts = 0.0
 
     async def probe_computer(self, timeout_sec: float = 2.0) -> tuple[bool, str]:
-        """优先探测台式机 PC Agent (10.144.232.236:8766)，获取前台实时活动与状态。"""
-        pc_agent_url = "http://10.144.232.236:8766/api/pc/activity?level=detail"
+        """优先探测台式机 PC Agent，获取前台实时活动与状态。"""
+        host = os.environ.get("ECHO_PC_AGENT_HOST", "10.144.232.236")
+        port = int(os.environ.get("ECHO_PC_AGENT_PORT", "8766"))
+        pc_agent_url = f"http://{host}:{port}/api/pc/activity?level=detail"
+        token = os.environ.get("ECHO_PC_TOKEN", "").strip()
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_sec)) as session:
-                async with session.get(pc_agent_url) as resp:
+                async with session.get(pc_agent_url, headers=headers) as resp:
                     if resp.status == 200:
                         payload = await resp.json(content_type=None)
                         if isinstance(payload, dict) and (payload.get("status") == "online" or bool(payload.get("app"))):
@@ -169,23 +174,25 @@ class PCProber:
             if req.system_prompt:
                 req.system_prompt = f"{req.system_prompt.strip()}\n\n{status}\n"
 
-    @staticmethod
-    def send_wol(mac: str = "B0-25-AA-59-A9-27") -> tuple[bool, str]:
+    @classmethod
+    def send_wol(cls, mac: str | None = None) -> tuple[bool, str]:
         """局域网唤醒台式机：广播 WOL Magic Packet。"""
+        target_mac = mac or os.environ.get("ECHO_PC_MAC", "B0-25-AA-59-A9-27")
+        bcast_ip = os.environ.get("ECHO_PC_WOL_BCAST", "100.67.255.255")
         try:
-            mac_bytes = bytes.fromhex(mac.replace(":", "").replace("-", ""))
+            mac_bytes = bytes.fromhex(target_mac.replace(":", "").replace("-", ""))
             magic = b"\xff" * 6 + mac_bytes * 16
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                for bcast in ("100.67.255.255", "255.255.255.255"):
+                for bcast in (bcast_ip, "255.255.255.255"):
                     try:
                         s.sendto(magic, (bcast, 9))
                     except Exception:
                         pass
             return True, (
                 f"📡 已向局域网广播 Magic Packet 唤醒台式机！\n"
-                f"• 目标网卡: Realtek PCIe GbE ({mac})\n"
-                f"• 广播网段: 100.67.255.255:9\n"
+                f"• 目标网卡: Realtek PCIe GbE ({target_mac})\n"
+                f"• 广播网段: {bcast_ip}:9\n"
                 f"• 请确认主板 BIOS 中已开启 PME / Wake on LAN。"
             )
         except Exception as exc:

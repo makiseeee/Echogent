@@ -105,3 +105,9 @@ class CompanionHUD:
             out_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception as exc:
             logger.warning(f"[CompanionHUD] 导出桌面待办失败: {exc}")
+
+    @classmethod
+    async def export_companion_tasks_async(cls, vault_dir: Path | None = None) -> None:
+        """异步非阻塞导出桌面待办清单，避免主事件循环发生磁盘 I/O 阻塞。"""
+        await asyncio.to_thread(cls.export_companion_tasks, vault_dir)
+
