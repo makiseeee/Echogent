@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "\U0001F4D6 文档 / Documentation"
+    url: https://github.com/makiseeee/Echogent/tree/main/docs
+    about: "查阅项目文档 / Browse project documentation"
