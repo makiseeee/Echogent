@@ -4,16 +4,20 @@ node_modules/
 __pycache__/
 *.py[cod]
 download/
+*.metadata.json
 
-# AstrBot 运行数据（含密钥、数据库、日志；保留 README 占位）
+# AstrBot 运行数据
 astrbot/data/*
 !astrbot/data/README.md
+!astrbot/data/plugins
+astrbot/data/plugins/*
+!astrbot/data/plugins/echo-tools
 
-# 备份产物（保留 README 占位）
+# 备份产物
 backups/*
 !backups/README.md
 
-# 个人记忆/偏好（含 QQ 号、作息等私密信息，不入公开库；保留 memory/README.md 占位）
+# 个人记忆/偏好
 memory/*
 !memory/README.md
 MEMORY.md
@@ -21,7 +25,7 @@ USER.md
 RELATIONSHIP.md
 personality-log.md
 
-# 用户私密档案（含电话/邮箱，不入库）
+# 用户私密档案
 wenbo-profile.md
 
 # 环境变量与密钥
@@ -29,19 +33,24 @@ wenbo-profile.md
 .env.*
 mcp-executor/.env
 
-# 仅供本机所有者使用的操作手册（可能包含设备与个人工作流细节）
+# 仅供本机所有者使用的操作手册
 docs/private/
 conversation-import/
 scripts/private/
 conversation.md
 archive/private/
 
-# MCP 执行工作区（保留说明文件）
+# MCP 执行工作区
 mcp-executor/workspace/*
 !mcp-executor/workspace/README.md
 
-# 系统
+# 系统与运行时数据库
 .DS_Store
 Thumbs.db
-data/
+/data/
 *.db
+*.db-wal
+*.db-shm
+*.bak
+desktop_companion/archive/
+astrbot/data/plugins/echo-tools/data/

@@ -1,0 +1,6 @@
+name: echo-tools
+display_name: echo 工具集
+desc: 为 echo 提供免费 DuckDuckGo 联网搜索与安全计算器
+version: 1.0.0
+author: echo
+repo: ""

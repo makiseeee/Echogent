@@ -52,16 +52,14 @@ start_napcat() {
 }
 
 start_memory_daily() {
-  if [ -x "$MEMORY_SCRIPT" ] && ! tmux has-session -t "$MEMORY_SESSION" 2>/dev/null; then
-    tmux new-session -d -s "$MEMORY_SESSION" "$MEMORY_SCRIPT"
-  fi
+  # Disabled: 记忆整理已由 SelfEvolution NightlyBatch (00:10) 完全接管，避免空转
+  return 0
 }
 
 case "${1:-status}" in
   start)
     if tmux has-session -t "$SESSION" 2>/dev/null; then
       start_napcat
-      start_memory_daily
       echo "echo already running"
       exit 0
     fi
@@ -70,7 +68,6 @@ case "${1:-status}" in
     for _ in $(seq 1 60); do
       if curl -fsS --max-time 2 http://127.0.0.1:6185/ >/dev/null; then
         start_napcat
-        start_memory_daily
         echo "echo started: http://127.0.0.1:6185"
         exit 0
       fi
