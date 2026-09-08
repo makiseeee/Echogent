@@ -79,7 +79,7 @@ deploy_ssh() {
     tmux new-session -d -s echo "$cmd"
 
     echo "等待 AstrBot 绑定 6185 端口..."
-    for i in $(seq 1 45); do
+    for i in $(seq 1 60); do
       if curl -fsS --max-time 2 http://127.0.0.1:6185/ >/dev/null 2>&1; then
         echo "AstrBot 已就绪 (${i}x2s)"
         exit 0
