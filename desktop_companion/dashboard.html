@@ -774,9 +774,9 @@
     
     <div style="font-size: 11px; color: #888;">屏幕亮度调控:</div>
     <div class="dev-btns">
-      <button class="dev-btn" onclick="setCompanionBrightness(110)">💡 柔和 110</button>
-      <button class="dev-btn" onclick="setCompanionBrightness(150)">💡 舒适 150</button>
-      <button class="dev-btn" onclick="setCompanionBrightness(190)">💡 明亮 190</button>
+      <button class="dev-btn" onclick="setCompanionBrightness(130)">🌙 柔和 130</button>
+      <button class="dev-btn" onclick="setCompanionBrightness(190)">💡 舒适 190</button>
+      <button class="dev-btn" onclick="setCompanionBrightness(230)">☀️ 明亮 230</button>
     </div>
     <div style="font-size: 11px; color: #888; margin-top: 4px;">动作微调:</div>
     <div class="dev-btns">
@@ -1872,7 +1872,7 @@
         const res = await fetch('/api/silence/toggle', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ silenced: targetState, screen_dim: wantScreenDim })
+          body: JSON.stringify({ silenced: targetState, screen_dim: wantScreenDim, manual: true })
         });
         if (res.ok) {
           const data = await res.json();
