@@ -14,9 +14,11 @@ import threading
 try:
     from .obsidian_access import AccessMode, VaultAccessPolicy
     from .obsidian_git import VaultGitSync
+    from .obsidian_search import index_single_note, _title
 except ImportError:
     from obsidian.obsidian_access import AccessMode, VaultAccessPolicy
     from obsidian.obsidian_git import VaultGitSync
+    from obsidian.obsidian_search import index_single_note, _title
 
 MAX_NOTE_CHARS = 20_000
 MAX_LINKS = 20
@@ -129,6 +131,8 @@ class NoteWriteService:
             except FileExistsError as exc:
                 raise FileExistsError("目标笔记已存在，拒绝覆盖") from exc
             del self._pending[operation_id]
+            title = _title(target, operation.text)
+            index_single_note(self.policy, operation.path, title, operation.text)
         self._audit(operation, "committed")
         return operation
 
@@ -202,6 +206,8 @@ class NoteWriteService:
             temp.write_text(operation.updated_text, encoding="utf-8")
             temp.replace(note.absolute)
             del self._pending_links[operation_id]
+            title = _title(note.absolute, operation.updated_text)
+            index_single_note(self.policy, operation.path, title, operation.updated_text)
         self._audit_link(operation, "link_committed", f"backup={backup}")
         return operation
 

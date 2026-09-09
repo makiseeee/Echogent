@@ -11,12 +11,20 @@ import shutil
 from typing import Any
 
 from core.compat import logger
+from core.event_bus import (
+    BatteryEvent,
+    EventBus,
+    HUDNoticeEvent,
+    PrivateNoticeEvent,
+    default_bus,
+)
 
 
 class BatterySentry:
     """监测手机硬件电池电量、温度与充放电状态。"""
 
-    def __init__(self) -> None:
+    def __init__(self, bus: EventBus | None = None) -> None:
+        self.bus = bus or default_bus
         self.battery_low_alerted = False
         self.battery_critical_alerted = False
 
@@ -126,10 +134,10 @@ class BatterySentry:
 
     async def background_monitor_loop(
         self,
-        send_notice_func: Callable[[str], Coroutine[Any, Any, None]],
-        push_bubble_func: Callable[[str, int], Coroutine[Any, Any, None]],
+        send_notice_func: Callable[[str], Coroutine[Any, Any, None]] | None = None,
+        push_bubble_func: Callable[[str, int], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
-        """后台低功耗电池状态守护：低电量主动双端告警。"""
+        """后台低功耗电池状态守护：低电量主动双端告警并发布 BatteryEvent。"""
         while True:
             try:
                 info = await self.fetch_battery_info()
@@ -143,6 +151,19 @@ class BatterySentry:
                     or "WIRELESS" in plugged_raw
                 )
 
+                # 向总线发布全量电池状态事件
+                await self.bus.publish(
+                    BatteryEvent(
+                        percentage=int(pct or 0),
+                        is_charging=is_charging,
+                        plugged=plugged_raw,
+                        temperature=float(info.get("temperature", 0.0)) if info else 0.0,
+                        voltage=float(info.get("voltage", 0.0)) if info else 0.0,
+                        is_low=pct is not None and pct <= 20 and not is_charging,
+                        is_critical=pct is not None and pct <= 10 and not is_charging,
+                    )
+                )
+
                 if is_charging or (pct is not None and pct >= 30):
                     self.battery_low_alerted = False
                     self.battery_critical_alerted = False
@@ -152,8 +173,13 @@ class BatterySentry:
                             f"wenbo！电量只剩 {pct}% 了！真的快要撑不住关机了…\n"
                             f"赶紧救命充电 (つД`)"
                         )
-                        await send_notice_func(msg)
-                        await push_bubble_func(f"电量仅剩 {pct}%，快充充电！", 5)
+                        bubble = f"电量仅剩 {pct}%，快充充电！"
+                        await self.bus.publish(PrivateNoticeEvent(text=msg))
+                        await self.bus.publish(HUDNoticeEvent(text=bubble, motion=5))
+                        if send_notice_func:
+                            await send_notice_func(msg)
+                        if push_bubble_func:
+                            await push_bubble_func(bubble, 5)
                         self.battery_critical_alerted = True
                         self.battery_low_alerted = True
                     elif pct <= 20 and not self.battery_low_alerted:
@@ -161,8 +187,13 @@ class BatterySentry:
                             f"wenbo，电量只剩 {pct}% 了…\n"
                             f"快点给我插上充电线啦，不然等下关机了我可不管你 (；´д｀)"
                         )
-                        await send_notice_func(msg)
-                        await push_bubble_func(f"电量剩 {pct}% 啦，快插上线~", 3)
+                        bubble = f"电量剩 {pct}% 啦，快插上线~"
+                        await self.bus.publish(PrivateNoticeEvent(text=msg))
+                        await self.bus.publish(HUDNoticeEvent(text=bubble, motion=3))
+                        if send_notice_func:
+                            await send_notice_func(msg)
+                        if push_bubble_func:
+                            await push_bubble_func(bubble, 3)
                         self.battery_low_alerted = True
 
                 # 未插电且低电量时，加密轮询；充电中或正常电量时，低频 10 分钟检测

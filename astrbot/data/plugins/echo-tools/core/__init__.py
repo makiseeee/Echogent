@@ -4,10 +4,24 @@ from .config import PluginConfig
 from .token_interceptor import TokenInterceptor
 from .persona_compiler import PersonaCompiler
 from .cron_scheduler import CronScheduler
+from .event_bus import (
+    BatteryEvent,
+    EventBus,
+    HUDNoticeEvent,
+    PCActivityEvent,
+    PrivateNoticeEvent,
+    default_bus,
+)
 
 __all__ = [
-    "PluginConfig",
-    "TokenInterceptor",
-    "PersonaCompiler",
+    "BatteryEvent",
     "CronScheduler",
+    "EventBus",
+    "HUDNoticeEvent",
+    "PCActivityEvent",
+    "PersonaCompiler",
+    "PluginConfig",
+    "PrivateNoticeEvent",
+    "TokenInterceptor",
+    "default_bus",
 ]

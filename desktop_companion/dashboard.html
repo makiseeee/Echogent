@@ -586,6 +586,25 @@
       gap: 7px;
       font-weight: 500;
       color: var(--matcha-green);
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: all 0.25s ease;
+      user-select: none;
+    }
+    .sentry-badge:hover {
+      background: rgba(225, 210, 185, 0.08);
+      border-color: rgba(225, 210, 185, 0.25);
+    }
+    .sentry-badge.silenced {
+      color: #94a3b8;
+      background: rgba(30, 36, 50, 0.7);
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+    .sentry-badge.silenced .status-dot {
+      background: #64748b;
+      box-shadow: 0 0 6px rgba(100, 116, 139, 0.6);
     }
 
     .status-dot {
@@ -594,6 +613,7 @@
       border-radius: 50%;
       background: var(--matcha-green);
       box-shadow: 0 0 6px var(--matcha-green);
+      transition: all 0.25s ease;
     }
 
     .device-info-tag {
@@ -611,7 +631,7 @@
       display: flex;
       gap: 8px;
       z-index: 200;
-      opacity: 0.2;
+      opacity: 0.75;
       transition: opacity 0.3s ease;
     }
     #top-tools:hover, #top-tools:active {
@@ -633,6 +653,39 @@
       background: rgba(208, 90, 63, 0.2);
       color: #fff;
       border-color: var(--stamp-red);
+    }
+    .tool-btn.active-silence {
+      background: rgba(100, 116, 139, 0.35);
+      color: #f1f5f9;
+      border-color: rgba(148, 163, 184, 0.6);
+      box-shadow: 0 0 8px rgba(100, 116, 139, 0.4);
+    }
+
+    /* ── 离席静默轻量 Toast 提醒 ── */
+    #silence-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(20, 24, 32, 0.95);
+      border: 1.2px solid rgba(225, 210, 185, 0.3);
+      color: var(--ink-white);
+      font-family: 'TechoSongti', "Songti SC", serif;
+      font-size: 12.5px;
+      padding: 7px 18px;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.85);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #silence-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     #dev-drawer {
@@ -664,12 +717,53 @@
       cursor: pointer;
     }
     .dev-btn:hover { background: var(--stamp-red); color: #fff; border-color: var(--stamp-red); }
+
+    /* ── 阶段三 Option A：纯黑夜间断光遮罩 (Zero Light Pollution Overlay) ── */
+    #ambient-night-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000000;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #ambient-night-overlay.sleep-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .night-clock {
+      font-family: 'TechoGeorgia', serif;
+      font-size: 28px;
+      color: #1a1a1a; /* 极暗微光时钟，仅在极近距离隐约可辨 */
+      letter-spacing: 2px;
+    }
+    .night-hint {
+      font-family: 'TechoSongti', serif;
+      font-size: 11px;
+      color: #111111;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
 
+  <!-- 阶段三 Option A：纯黑夜间断光休眠遮罩 -->
+  <div id="ambient-night-overlay" onclick="handleNightOverlayClick()">
+    <div class="night-clock" id="night-clock-text">00:00</div>
+    <div class="night-hint" id="night-hint-text">· 夜间极暗睡眠 · 伴读守护中 ·</div>
+  </div>
+
   <!-- 工具栏 -->
   <div id="top-tools">
+    <button class="tool-btn" onclick="toggleManualSilence()" id="silence-btn" title="点击切换离席静默模式">🌙 离席静默</button>
     <button class="tool-btn" onclick="toggleScreenMode()" id="screen-toggle-btn">📱 模拟框模式</button>
     <button class="tool-btn" onclick="toggleDevDrawer()">⚙ 调测</button>
   </div>
@@ -678,7 +772,13 @@
   <div id="dev-drawer">
     <div class="dev-title">🛠️ 伴侣互动与对白调测</div>
     
-    <div style="font-size: 11px; color: #888;">动作微调:</div>
+    <div style="font-size: 11px; color: #888;">屏幕亮度调控:</div>
+    <div class="dev-btns">
+      <button class="dev-btn" onclick="setCompanionBrightness(110)">💡 柔和 110</button>
+      <button class="dev-btn" onclick="setCompanionBrightness(150)">💡 舒适 150</button>
+      <button class="dev-btn" onclick="setCompanionBrightness(190)">💡 明亮 190</button>
+    </div>
+    <div style="font-size: 11px; color: #888; margin-top: 4px;">动作微调:</div>
     <div class="dev-btns">
       <button class="dev-btn" onclick="playCompanionMotion('Idle', 0)">m01 待机</button>
       <button class="dev-btn" onclick="playCompanionMotion('Idle', 1)">m02 点头</button>
@@ -691,6 +791,14 @@
       <button class="dev-btn" onclick="triggerSpeech('wenbo，自习快一小时啦，喝口水休息一下吧~', 1)">温情提醒</button>
       <button class="dev-btn" onclick="triggerSpeech('今天任务进度很顺利，wenbo 表现超棒！', 2)">鼓励赞美</button>
       <button class="dev-btn" onclick="triggerSpeech('（检测到有人靠近，已静默保护桌面隐私）', 3)">防社死遮蔽</button>
+    </div>
+
+    <div style="font-size: 11px; color: #888; margin-top: 4px;">Stage 4 拟真手势测试:</div>
+    <div class="dev-btns">
+      <button class="dev-btn" onclick="triggerSingleTapGesture(container.clientWidth*0.5, container.clientHeight*0.25)">摸头微笑</button>
+      <button class="dev-btn" onclick="triggerSingleTapGesture(container.clientWidth*0.55, container.clientHeight*0.52)">戳脸鼓腮</button>
+      <button class="dev-btn" onclick="triggerDoubleTapGesture(container.clientWidth*0.5, container.clientHeight*0.5)">双击受惊</button>
+      <button class="dev-btn" onclick="triggerLongPressGesture(container.clientWidth*0.5, container.clientHeight*0.5)">长按害羞</button>
     </div>
   </div>
 
@@ -785,9 +893,9 @@
 
       <!-- 3. 底部温情手札页脚 -->
       <div class="hud-status-card">
-        <div class="sentry-badge">
+        <div class="sentry-badge" id="silence-toggle-badge" onclick="toggleManualSilence()" title="点击切换离席静默模式">
           <div class="status-dot"></div>
-          <span>Echo 桌前伴侣 · 静音专注中</span>
+          <span id="silence-badge-text">Echo 桌前伴侣 · 静音专注中</span>
         </div>
         <div class="device-info-tag">手账 No. 2026-09 · MIX 2 页</div>
       </div>
@@ -825,6 +933,7 @@
     let typeInterval = null;
 
     function triggerSpeech(fullText, motionIndex = null) {
+      if (isSilenced) return;
       if (bubbleTimeout) clearTimeout(bubbleTimeout);
       if (typeInterval) clearInterval(typeInterval);
 
@@ -882,39 +991,500 @@
         resizeModel();
         window.addEventListener('resize', resizeModel);
 
-        // 视线追踪
-        let lastInteraction = Date.now();
-        window.addEventListener('pointermove', (e) => {
-          lastInteraction = Date.now();
-          if (live2dModel && live2dModel.focus) {
-            const rect = canvas.getBoundingClientRect();
-            live2dModel.focus(e.clientX - rect.left, e.clientY - rect.top);
+        // ── 3.1 四轨道多层动作混合物理与连续情绪罗盘引擎 (Stage 4.1 & 4.2) ──
+
+        // [Track 0] 二阶阻尼谐振子发丝弹簧物理 (Damped Harmonic Oscillator)
+        class DampedSpring {
+          constructor(omega, zeta, minVal = -1.0, maxVal = 1.0) {
+            this.omega = omega;  // 固有角频率 (rad/s)
+            this.zeta = zeta;    // 阻尼比 (0.6 ~ 0.85 欠阻尼轻盈回弹)
+            this.minVal = minVal;
+            this.maxVal = maxVal;
+            this.x = 0.0;
+            this.v = 0.0;
+          }
+          update(dt, target = 0.0, force = 0.0) {
+            const k = this.omega * this.omega;
+            const c = 2.0 * this.zeta * this.omega;
+            const a = -c * this.v - k * (this.x - target) + force;
+            this.v += a * dt;
+            this.x += this.v * dt;
+            this.x = Math.max(this.minVal, Math.min(this.maxVal, this.x));
+            return this.x;
+          }
+          impulse(f) {
+            this.v += f;
+          }
+        }
+
+        // [Track 1] 伴读坐姿重心状态机 (Reading Posture Dynamics, 60~120s 渐变切换)
+        class ReadingPostureController {
+          constructor() {
+            this.postures = [
+              { name: 'center', bodyX: 0.0, bodyY: -1.2, bodyZ: 0.0 },      // 伏案端正
+              { name: 'left_lean', bodyX: -2.8, bodyY: -0.8, bodyZ: -1.8 }, // 微托颊左倾伴读
+              { name: 'right_techo', bodyX: 3.2, bodyY: -1.0, bodyZ: 2.0 },  // 侧身看手帐日程
+              { name: 'deep_read', bodyX: 0.0, bodyY: -2.6, bodyZ: 0.0 }     // 深入研读低头
+            ];
+            this.current = { ...this.postures[0] };
+            this.source = { ...this.postures[0] };
+            this.target = { ...this.postures[0] };
+            this.transitionStart = 0;
+            this.transitionDuration = 4500;
+            this.nextShiftTime = Date.now() + 45000 + Math.random() * 35000;
+          }
+          update(now) {
+            if (now >= this.nextShiftTime) {
+              const nextIdx = (Math.floor(Math.random() * (this.postures.length - 1)) + 1) % this.postures.length;
+              this.source = { ...this.current };
+              this.target = { ...this.postures[nextIdx] };
+              this.transitionStart = now;
+              this.transitionDuration = 4200 + Math.random() * 1600;
+              this.nextShiftTime = now + 60000 + Math.random() * 60000; // 60s ~ 120s
+            }
+            if (now < this.transitionStart + this.transitionDuration) {
+              const p = Math.max(0, Math.min(1, (now - this.transitionStart) / this.transitionDuration));
+              const smoothP = p * p * (3 - 2 * p); // Cubic smoothstep
+              this.current.bodyX = this.source.bodyX + (this.target.bodyX - this.source.bodyX) * smoothP;
+              this.current.bodyY = this.source.bodyY + (this.target.bodyY - this.source.bodyY) * smoothP;
+              this.current.bodyZ = this.source.bodyZ + (this.target.bodyZ - this.source.bodyZ) * smoothP;
+            } else {
+              this.current = { ...this.target };
+            }
+            return this.current;
+          }
+        }
+
+        // [Track 2] 眉毛多维张力解耦 (Decoupled Eyebrow Tension & Micro-Expressions)
+        class EyebrowController {
+          constructor() {
+            this.browLY = 0.0;
+            this.browRY = 0.0;
+            this.browLAngle = 0.0;
+            this.browRAngle = 0.0;
+            this.browLForm = 0.0;
+            this.browRForm = 0.0;
+          }
+          update(dt, vat) {
+            const targetY = (vat.a > 0.4 ? (vat.a - 0.4) * 1.3 : 0.0) + (vat.v > 0.3 ? 0.25 : 0.0);
+            const targetAngle = (vat.t * (vat.a > 0 ? -0.45 : 0.35)) + (vat.v < -0.2 ? 0.3 : 0.0);
+            const targetForm = vat.v * 0.4 - vat.t * 0.3;
+
+            const lerpSpeed = Math.min(1.0, 5.5 * dt);
+            this.browLY += (targetY - this.browLY) * lerpSpeed;
+            this.browRY += (targetY - this.browRY) * lerpSpeed;
+            this.browLAngle += (targetAngle - this.browLAngle) * lerpSpeed;
+            this.browRAngle += (targetAngle - this.browRAngle) * lerpSpeed;
+            this.browLForm += (targetForm - this.browLForm) * lerpSpeed;
+            this.browRForm += (targetForm - this.browRForm) * lerpSpeed;
+          }
+          apply(core) {
+            try {
+              core.setParameterValueById('ParamBrowLY', this.browLY);
+              core.setParameterValueById('ParamBrowRY', this.browRY);
+              core.setParameterValueById('ParamBrowLAngle', this.browLAngle);
+              core.setParameterValueById('ParamBrowRAngle', this.browRAngle);
+              core.setParameterValueById('ParamBrowLForm', this.browLForm);
+              core.setParameterValueById('ParamBrowRForm', this.browRForm);
+            } catch(e) {}
+          }
+        }
+
+        // [Stage 4.2] 连续 Valence-Arousal-Tsundere (VAT) 情绪罗盘动力学
+        class VATEmotionEngine {
+          constructor() {
+            this.v = 0.1;   // Valence (愉悦度 -1.0 ~ +1.0)
+            this.a = -0.2;  // Arousal (激活度 -1.0 ~ +1.0)
+            this.t = 0.0;   // Tsundere (傲娇偏置 0.0 ~ 1.0)
+            this.baseV = 0.1;
+            this.baseA = -0.2;
+            this.baseT = 0.0;
+            this.tauV = 16.0; // 衰减半衰期 (秒)
+            this.tauA = 8.0;
+            this.tauT = 25.0;
+          }
+          impulse(dV, dA, dT) {
+            this.v = Math.max(-1.0, Math.min(1.0, this.v + dV));
+            this.a = Math.max(-1.0, Math.min(1.0, this.a + dA));
+            this.t = Math.max(0.0, Math.min(1.0, this.t + dT));
+          }
+          update(dt) {
+            this.v += -((this.v - this.baseV) / this.tauV) * dt;
+            this.a += -((this.a - this.baseA) / this.tauA) * dt;
+            this.t += -((this.t - this.baseT) / this.tauT) * dt;
+          }
+          getBlush() {
+            return Math.max(0, Math.min(1.0, this.t * 0.75 + (this.a > 0 ? this.a * 0.25 : 0) + (this.v > 0.3 ? 0.2 : 0)));
+          }
+          getMouthForm() {
+            if (this.t > 0.35 && this.a > 0.05) {
+              return -0.85 * Math.min(1.0, this.t * 1.2);
+            }
+            return Math.max(-1.0, Math.min(1.0, this.v * 0.85));
+          }
+          getBreathingPeriod() {
+            const factor = (this.a + 1.0) * 0.5; // 0 to 1
+            return 4.4 - factor * 1.4; // 3.0s ~ 4.4s
+          }
+        }
+
+        // 实例化动力学引擎
+        const vatEngine = new VATEmotionEngine();
+        window.vatEngine = vatEngine;
+        const readingPosture = new ReadingPostureController();
+        const eyebrowCtrl = new EyebrowController();
+        const ahogeSpring = new DampedSpring(16.0, 0.65, -1.0, 1.0);
+        window.ahogeSpring = ahogeSpring;
+        const hairFrontSpring = new DampedSpring(11.0, 0.72, -1.0, 1.0);
+        window.hairFrontSpring = hairFrontSpring;
+        const hairBackSpring = new DampedSpring(8.0, 0.80, -1.0, 1.0);
+        window.hairBackSpring = hairBackSpring;
+
+        let lastHeadAngleX = 0;
+        let lastHeadAngleZ = 0;
+        let lastTime = Date.now();
+
+        let lastUserInteraction = Date.now();
+        let currentGazeX = container.clientWidth * 0.5;
+        let currentGazeY = container.clientHeight * 0.35;
+        let targetGazeX = currentGazeX;
+        let targetGazeY = currentGazeY;
+        let idleGazeX = currentGazeX;
+        let idleGazeY = currentGazeY;
+        let nextSaccadeTime = Date.now() + 2000;
+
+        // 泊松自然眨眼
+        let isBlinking = false;
+        let blinkStartTime = 0;
+        let nextBlinkTime = Date.now() + 2000;
+        let isDoubleBlink = false;
+
+        // 微表情慢衰减与情绪动力学覆盖
+        let currentBlush = 0.0;
+        let poutEndTime = 0;
+        let headTiltEndTime = 0;
+        let headTiltTarget = 0;
+        let shoulderShrugEndTime = 0;
+
+        function updatePoissonBlink(core, now, arousal = 0) {
+          if (isBlinking) {
+            const elapsed = now - blinkStartTime;
+            let eyeVal = 1.0;
+            if (elapsed < 60) {
+              eyeVal = 1.0 - (elapsed / 60);
+            } else if (elapsed < 95) {
+              eyeVal = 0.0;
+            } else if (elapsed < 185) {
+              const t = (elapsed - 95) / 90;
+              eyeVal = t * t * (3 - 2 * t);
+            } else {
+              isBlinking = false;
+              eyeVal = 1.0;
+              if (isDoubleBlink) {
+                isDoubleBlink = false;
+                nextBlinkTime = now + 160 + Math.random() * 80;
+              } else {
+                // Arousal 高时眨眼略频繁
+                const baseInterval = arousal > 0.4 ? 2400 : 3200;
+                const interval = -Math.log(1 - Math.random() * 0.92) * baseInterval + 1800;
+                nextBlinkTime = now + Math.min(6800, interval);
+                isDoubleBlink = Math.random() < 0.20;
+              }
+            }
+            try {
+              core.setParameterValueById('ParamEyeLOpen', eyeVal);
+              core.setParameterValueById('ParamEyeROpen', eyeVal);
+            } catch(e) {}
+          } else if (now >= nextBlinkTime) {
+            isBlinking = true;
+            blinkStartTime = now;
+          }
+        }
+
+        function updateEmotionDynamics(core, now, delta, vat) {
+          try {
+            const vatBlush = vat.getBlush();
+            currentBlush += (vatBlush - currentBlush) * 0.08;
+            if (currentBlush > 0.01) {
+              core.setParameterValueById('ParamCheek', Math.min(1.0, currentBlush));
+            }
+
+            if (now < poutEndTime) {
+              core.setParameterValueById('ParamMouthForm', -0.85);
+            } else {
+              core.setParameterValueById('ParamMouthForm', vat.getMouthForm());
+            }
+
+            if (now < headTiltEndTime) {
+              const remaining = Math.max(0, (headTiltEndTime - now) / 2600);
+              const angle = headTiltTarget * Math.sin(remaining * Math.PI);
+              core.setParameterValueById('ParamAngleZ', angle);
+            }
+
+            if (now < shoulderShrugEndTime) {
+              const remaining = Math.max(0, (shoulderShrugEndTime - now) / 850);
+              core.setParameterValueById('ParamShoulder', 0.85 * Math.sin(remaining * Math.PI));
+            }
+          } catch(e) {}
+        }
+
+        function updateGaze(now) {
+          if (!live2dModel || !live2dModel.focus) return;
+          const w = container.clientWidth;
+          const h = container.clientHeight;
+
+          if (now - lastUserInteraction < 2800) {
+            currentGazeX += (targetGazeX - currentGazeX) * 0.14;
+            currentGazeY += (targetGazeY - currentGazeY) * 0.14;
+          } else {
+            if (now >= nextSaccadeTime) {
+              const r = Math.random();
+              if (r < 0.45) {
+                idleGazeX = w * (1.15 + Math.random() * 0.3);
+                idleGazeY = h * (0.35 + Math.random() * 0.3);
+              } else if (r < 0.70) {
+                idleGazeX = w * (0.35 + Math.random() * 0.3);
+                idleGazeY = h * 0.85;
+              } else if (r < 0.90) {
+                idleGazeX = w * 0.50;
+                idleGazeY = h * 0.38;
+              } else {
+                idleGazeX = w * (0.45 + Math.random() * 0.2);
+                idleGazeY = h * 0.15;
+              }
+              nextSaccadeTime = now + 2800 + Math.random() * 2600;
+            }
+
+            const breathJitter = Math.sin(now * 0.0018) * 10;
+            currentGazeX += (idleGazeX - currentGazeX) * 0.045;
+            currentGazeY += ((idleGazeY + breathJitter) - currentGazeY) * 0.045;
+          }
+
+          live2dModel.focus(currentGazeX, currentGazeY);
+        }
+
+        pixiApp.ticker.add((delta) => {
+          if (isSilenced) return;
+          if (!live2dModel || !live2dModel.internalModel || !live2dModel.internalModel.coreModel) return;
+          const core = live2dModel.internalModel.coreModel;
+          const now = Date.now();
+          const dt = Math.min(0.1, Math.max(0.001, (now - lastTime) / 1000));
+          lastTime = now;
+
+          // 1. VAT 连续情绪演化与呼吸速率调制
+          vatEngine.update(dt);
+          const breathPeriod = vatEngine.getBreathingPeriod();
+          const breathVal = (Math.sin((now / 1000) * (2 * Math.PI / breathPeriod)) + 1.0) * 0.5;
+          try { core.setParameterValueById('ParamBreath', breathVal); } catch(e) {}
+
+          // 2. 泊松随机非周期眨眼 (Arousal 调制)
+          updatePoissonBlink(core, now, vatEngine.a);
+
+          // 3. 伴读坐姿重心平滑渐变切换 (Track 1)
+          const posture = readingPosture.update(now);
+          try {
+            core.setParameterValueById('ParamBodyAngleX', posture.bodyX);
+            core.setParameterValueById('ParamBodyAngleY', posture.bodyY);
+            core.setParameterValueById('ParamBodyAngleZ', posture.bodyZ);
+          } catch(e) {}
+
+          // 4. 视线平滑游移 (Track 3)
+          updateGaze(now);
+
+          // 5. 阻尼弹簧发丝回弹物理 (Track 0)
+          let currentHeadZ = 0, currentHeadX = 0;
+          try {
+            currentHeadZ = core.getParameterValueById('ParamAngleZ') || 0;
+            currentHeadX = core.getParameterValueById('ParamAngleX') || 0;
+          } catch(e) {}
+          const dAngleZ = (currentHeadZ - lastHeadAngleZ) / Math.max(0.016, dt);
+          const dAngleX = (currentHeadX - lastHeadAngleX) / Math.max(0.016, dt);
+          lastHeadAngleZ = currentHeadZ;
+          lastHeadAngleX = currentHeadX;
+
+          const hairBreathWave = Math.sin((now / 1000) * (2 * Math.PI / breathPeriod) + 0.4) * 0.08;
+          const ahogeForce = -dAngleZ * 0.035 - dAngleX * 0.02 + (Math.random() < 0.03 ? (Math.random() - 0.5) * 0.4 : 0);
+          const frontForce = -dAngleZ * 0.025 + hairBreathWave;
+          const backForce = -dAngleZ * 0.018 - hairBreathWave * 0.5;
+
+          const ahogeVal = ahogeSpring.update(dt, 0.0, ahogeForce);
+          const frontVal = hairFrontSpring.update(dt, 0.0, frontForce);
+          const backVal = hairBackSpring.update(dt, 0.0, backForce);
+
+          try {
+            core.setParameterValueById('ParamHairAhoge', ahogeVal);
+            core.setParameterValueById('ParamHairFront', frontVal);
+            core.setParameterValueById('ParamHairBack', backVal);
+          } catch(e) {}
+
+          // 6. 微表情张力与脸红/鼓腮/眉毛解耦 (Track 2)
+          updateEmotionDynamics(core, now, delta, vatEngine);
+          eyebrowCtrl.update(dt, vatEngine);
+          eyebrowCtrl.apply(core);
+
+          // 7. 离席静默态保持 (闭目静候)
+          if (isSilenced) {
+            try {
+              core.setParameterValueById('ParamEyeLOpen', 0.0);
+              core.setParameterValueById('ParamEyeROpen', 0.0);
+              core.setParameterValueById('ParamMouthOpenY', 0.0);
+              core.setParameterValueById('ParamAngleY', -6.0);
+            } catch(e) {}
           }
         });
 
-        // 闲置自然微环视
-        let wanderAngle = 0;
-        setInterval(() => {
-          if (Date.now() - lastInteraction > 3500) {
-            wanderAngle += 0.025;
-            const lookX = container.clientWidth * 0.5 + Math.sin(wanderAngle) * 80;
-            const lookY = container.clientHeight * 0.4 + Math.cos(wanderAngle * 0.7) * 40;
-            if (live2dModel && live2dModel.focus) live2dModel.focus(lookX, lookY);
-          }
-        }, 50);
+        // ── 3.2 全维触屏手势引擎 ──
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let longPressTimer = null;
+        let isLongPressActive = false;
+        let lastTapTimestamp = 0;
+        let lastTapX = 0;
+        let lastTapY = 0;
+        let singleTapTimer = null;
 
-        // 点击交互
-        canvas.addEventListener('click', (e) => {
+        canvas.addEventListener('pointerdown', (e) => {
+          if (isSilenced) {
+            toggleManualSilence(false);
+            return;
+          }
+          touchStartX = e.clientX;
+          touchStartY = e.clientY;
+          isLongPressActive = false;
+          lastUserInteraction = Date.now();
           const rect = canvas.getBoundingClientRect();
-          const clickY = e.clientY - rect.top;
-          if (clickY < rect.height * 0.45) {
+          targetGazeX = e.clientX - rect.left;
+          targetGazeY = e.clientY - rect.top;
+
+          if (singleTapTimer) {
+            clearTimeout(singleTapTimer);
+            singleTapTimer = null;
+          }
+
+          if (longPressTimer) clearTimeout(longPressTimer);
+          longPressTimer = setTimeout(() => {
+            isLongPressActive = true;
+            triggerLongPressGesture(touchStartX, touchStartY);
+          }, 1200);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          lastUserInteraction = Date.now();
+          const rect = canvas.getBoundingClientRect();
+          targetGazeX = e.clientX - rect.left;
+          targetGazeY = e.clientY - rect.top;
+
+          if (longPressTimer) {
+            const dx = e.clientX - touchStartX;
+            const dy = e.clientY - touchStartY;
+            if (Math.hypot(dx, dy) > 16) {
+              clearTimeout(longPressTimer);
+              longPressTimer = null;
+            }
+          }
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+
+          if (isLongPressActive) {
+            isLongPressActive = false;
+            return;
+          }
+
+          const now = Date.now();
+          const timeDiff = now - lastTapTimestamp;
+          const dist = Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY);
+
+          if (timeDiff < 320 && dist < 35) {
+            lastTapTimestamp = 0;
+            if (singleTapTimer) {
+              clearTimeout(singleTapTimer);
+              singleTapTimer = null;
+            }
+            triggerDoubleTapGesture(e.clientX, e.clientY);
+            return;
+          }
+
+          lastTapTimestamp = now;
+          lastTapX = e.clientX;
+          lastTapY = e.clientY;
+          singleTapTimer = setTimeout(() => {
+            triggerSingleTapGesture(lastTapX, lastTapY);
+            singleTapTimer = null;
+          }, 280);
+        });
+
+        canvas.addEventListener('pointercancel', () => {
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+          isLongPressActive = false;
+        });
+
+        window.triggerSingleTapGesture = function(clientX, clientY) {
+          const rect = canvas.getBoundingClientRect();
+          const relY = (clientY - rect.top) / rect.height;
+          const relX = (clientX - rect.left) / rect.width;
+
+          if (relY < 0.40) {
             playCompanionMotion('Idle', 1);
-            triggerSpeech('摸头会长不高的啦，wenbo！快看屏幕任务~');
+            vatEngine.impulse(0.5, 0.2, -0.2);
+            ahogeSpring.impulse(0.7); // 摸头呆毛弹性跳动
+            hairFrontSpring.impulse(0.25);
+            if (navigator.vibrate) try { navigator.vibrate(22); } catch(e) {}
+            const replies = [
+              '摸头会长不高的啦，wenbo！快看屏幕任务~',
+              '嘿嘿~ 摸头可以，今天也要元气满满哦！'
+            ];
+            triggerSpeech(replies[Math.floor(Math.random() * replies.length)], 2);
+          } else if (relY <= 0.68) {
+            playCompanionMotion('Idle', 5);
+            vatEngine.impulse(-0.25, 0.55, 0.85); // 傲娇高偏置、高激活
+            ahogeSpring.impulse(-0.55);
+            hairFrontSpring.impulse(0.45);
+            poutEndTime = Date.now() + 3500;
+            headTiltTarget = (relX > 0.5) ? -15 : 15;
+            headTiltEndTime = Date.now() + 2600;
+            if (navigator.vibrate) try { navigator.vibrate([25, 35, 25]); } catch(e) {}
+            const replies = [
+              '喂！别捏脸啦，脸都要被你捏圆了… (鼓腮)',
+              '戳我干嘛，专心看右边的手帐待办啦！(偏头)'
+            ];
+            triggerSpeech(replies[Math.floor(Math.random() * replies.length)], 5);
           } else {
             playCompanionMotion('Idle', 2);
-            triggerSpeech('收到！今天也在认真陪 wenbo 自习哦。');
+            vatEngine.impulse(0.2, 0.1, -0.1);
+            hairBackSpring.impulse(0.25);
+            if (navigator.vibrate) try { navigator.vibrate(18); } catch(e) {}
+            triggerSpeech('收到！今天也在认真陪 wenbo 自习哦。', 2);
           }
-        });
+        };
+
+        window.triggerDoubleTapGesture = function(clientX, clientY) {
+          playCompanionMotion('TapBody', 0);
+          vatEngine.impulse(-0.45, 0.95, 0.35); // 受惊剧烈上涌
+          shoulderShrugEndTime = Date.now() + 850;
+          ahogeSpring.impulse(1.4); // 呆毛惊跳
+          hairFrontSpring.impulse(-0.8);
+          hairBackSpring.impulse(0.7);
+          if (navigator.vibrate) try { navigator.vibrate([35, 45, 35]); } catch(e) {}
+          triggerSpeech('干嘛突然敲屏幕啦，吓我一跳！');
+        };
+
+        window.triggerLongPressGesture = function(clientX, clientY) {
+          playCompanionMotion('Idle', 4);
+          vatEngine.impulse(0.35, 0.55, 1.0); // 害羞爆表
+          currentBlush = 0.95;
+          ahogeSpring.impulse(-0.4);
+          hairFrontSpring.impulse(0.35);
+          if (navigator.vibrate) try { navigator.vibrate([60, 40, 60]); } catch(e) {}
+          triggerSpeech('快放开啦，靠太近很热诶…', 4);
+        };
 
         setTimeout(() => {
           triggerSpeech('纯正日系手帐版面已就绪，wenbo 看看这次有没有纯正书桌手札的温润感！', 0);
@@ -956,6 +1526,17 @@
       drawer.classList.toggle('open');
     }
 
+    async function setCompanionBrightness(val) {
+      try {
+        await fetch('/api/brightness', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brightness: val })
+        });
+        showSilenceToast('屏幕亮度已固定为 ' + val, '💡');
+      } catch(e) {}
+    }
+
     // 点击任意非交互区域自动请求原生全屏 (隐藏浏览器地址栏与导航条)
     let hasRequestedFullscreen = false;
     document.addEventListener('click', (e) => {
@@ -966,14 +1547,122 @@
       }
     });
 
-    // ── 4. 手帐待办交互打卡 (真实动态百分比) ──
-    function toggleTask(el) {
-      el.classList.toggle('done');
+    // ── 4. 手帐待办交互打卡 (实时回写 Obsidian & 4 槽位智能裁剪 & 5 分钟撤销保留) ──
+    let isTaskSyncing = false;
+    let lastLoadedTaskData = null;
+    const RECENT_CHECK_GRACE_MS = 5 * 60 * 1000; // 5 分钟撤销保留期
+    const RECENT_CHECK_STORAGE_KEY = 'echo_recent_checked_tasks';
+
+    function getRecentCheckedMap() {
+      try {
+        const raw = localStorage.getItem(RECENT_CHECK_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        const now = Date.now();
+        let changed = false;
+        for (const k in parsed) {
+          if (now - parsed[k] >= RECENT_CHECK_GRACE_MS) {
+            delete parsed[k];
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem(RECENT_CHECK_STORAGE_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function markTaskRecentChecked(key) {
+      if (!key) return;
+      try {
+        const map = getRecentCheckedMap();
+        map[key] = Date.now();
+        localStorage.setItem(RECENT_CHECK_STORAGE_KEY, JSON.stringify(map));
+      } catch (e) {}
+    }
+
+    function unmarkTaskRecentChecked(key) {
+      if (!key) return;
+      try {
+        const map = getRecentCheckedMap();
+        delete map[key];
+        localStorage.setItem(RECENT_CHECK_STORAGE_KEY, JSON.stringify(map));
+      } catch (e) {}
+    }
+
+    async function handleTaskClick(el) {
+      if (isTaskSyncing) return; // 防抖，避免快速连击并发冲突
+      const name = el.getAttribute('data-name');
+      const id = el.getAttribute('data-id');
+      if (!name && !id) return;
+
+      const wasDone = el.classList.contains('done');
+      const newDone = !wasDone;
+      const taskKey = id || name;
+
+      // 记录在手机端打勾的状态 (5 分钟保留期)
+      if (newDone) {
+        markTaskRecentChecked(taskKey);
+      } else {
+        unmarkTaskRecentChecked(taskKey);
+      }
+
+      // 1. 瞬时乐观更新 UI
+      el.classList.toggle('done', newDone);
       const box = el.querySelector('.task-checkbox');
       if (box) {
-        box.textContent = el.classList.contains('done') ? '✓' : '';
+        box.textContent = newDone ? '✓' : '';
       }
       updateTaskProgress(true);
+
+      // 2. 微震动触感反馈
+      if (window.navigator && navigator.vibrate) {
+        try { navigator.vibrate(25); } catch(e) {}
+      }
+
+      // 3. Live2D 温情手帐互动
+      if (newDone) {
+        playCompanionMotion('Idle', 2);
+        triggerSpeech(`搞定「${name}」！这就帮 wenbo 记入手帐~`, 2);
+      } else {
+        playCompanionMotion('Idle', 1);
+        triggerSpeech(`好的，把「${name}」重新标为待办啦。`, 1);
+      }
+
+      // 4. 即时调用后端 API 回写 Obsidian 日记并触发 Git 同步
+      isTaskSyncing = true;
+      try {
+        const res = await fetch('/api/task/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, id: id, done: newDone })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Server error');
+
+        if (data.percent !== undefined) {
+          applyTaskData(data);
+        }
+      } catch (err) {
+        console.error('待办回写 Obsidian 异常:', err);
+        // 回滚乐观更新
+        el.classList.toggle('done', wasDone);
+        if (box) box.textContent = wasDone ? '✓' : '';
+        if (wasDone) markTaskRecentChecked(taskKey);
+        else unmarkTaskRecentChecked(taskKey);
+        updateTaskProgress(false);
+        triggerSpeech(`手帐回写有点小波动，再点一次试试？`, 3);
+      } finally {
+        setTimeout(() => { isTaskSyncing = false; }, 350);
+      }
+    }
+
+    function toggleTask(el) {
+      handleTaskClick(el);
     }
 
     function updateTaskProgress(isUserClick = false) {
@@ -1011,10 +1700,312 @@
       }
     }
 
+    function applyTaskData(data) {
+      if (!data) return;
+      lastLoadedTaskData = data;
+      const recentMap = getRecentCheckedMap();
+      const now = Date.now();
+
+      function isRecentChecked(t) {
+        const k = t.id || t.name;
+        return !!k && !!recentMap[k] && (now - recentMap[k] < RECENT_CHECK_GRACE_MS);
+      }
+
+      const allFocus = Array.isArray(data.focus) ? data.focus : [];
+      // 优先展示未完成任务；若是在手机上打勾的，在 5 分钟内继续保留在视窗内供查看或撤销
+      const activeCandidates = allFocus.filter(t => !t.done || isRecentChecked(t));
+      // 严格限制最大容纳 4 项，杜绝 5 项及以上挤压出卡片
+      const displayTasks = activeCandidates.slice(0, 4);
+
+      // 动态同步卡片标题日期
+      const latinSub = document.querySelector('.tasks-latin-sub');
+      if (latinSub && data.date) {
+        const parts = data.date.split('-');
+        const mDay = (parts.length === 3) ? `${parts[1]}.${parts[2]}` : data.date;
+        latinSub.textContent = `FOCUS ${Math.min(4, activeCandidates.length || displayTasks.length)} · ${mDay}`;
+      }
+
+      // 动态同步印章百分比与达成标记 (全量真实待办进度)
+      const percentEl = document.getElementById('tracker-percent');
+      const labelEl = document.getElementById('tracker-label');
+      if (percentEl && data.percent !== undefined) percentEl.textContent = `${data.percent}%`;
+      if (labelEl && data.percent !== undefined) labelEl.textContent = (data.percent === 100) ? '达成' : '完成';
+
+      // 动态同步打卡墨点
+      const dotsRow = document.querySelector('.dots-row');
+      if (dotsRow) {
+        const total = Math.max(1, data.total || 3);
+        const done = data.done || 0;
+        if (dotsRow.children.length !== total) {
+          dotsRow.innerHTML = '';
+          for (let i = 0; i < total; i++) {
+            const d = document.createElement('div');
+            d.className = 'techo-dot';
+            dotsRow.appendChild(d);
+          }
+        }
+        const dots = dotsRow.querySelectorAll('.techo-dot');
+        dots.forEach((dot, idx) => {
+          if (idx < done) dot.classList.add('done');
+          else dot.classList.remove('done');
+        });
+      }
+
+      // 动态更新未完成 Focus 待办列表 (如果用户正在点击则暂缓重绘避免打断手势)
+      if (isTaskSyncing) return;
+      const listEl = document.querySelector('.tasks-list');
+      if (listEl) {
+        if (displayTasks.length === 0) {
+          if (data.total > 0 && (data.done || 0) >= data.total) {
+            listEl.innerHTML = `
+              <div class="task-item done">
+                <div class="task-checkbox">✓</div>
+                <span class="task-text">✨ 今日待办全部达成！wenbo 辛苦啦~</span>
+              </div>
+            `;
+          } else {
+            listEl.innerHTML = `
+              <div class="task-item">
+                <div class="task-checkbox"></div>
+                <span class="task-text">暂无更多未完成待办</span>
+              </div>
+            `;
+          }
+        } else {
+          const orderKanji = ['①', '②', '③', '④'];
+          listEl.innerHTML = displayTasks.map((t, i) => `
+            <div class="task-item ${t.done ? 'done' : ''}"
+                 data-name="${(t.name || '').replace(/"/g, '&quot;')}"
+                 data-id="${(t.id || '').replace(/"/g, '&quot;')}"
+                 onclick="handleTaskClick(this)">
+              <div class="task-checkbox">${t.done ? '✓' : ''}</div>
+              <span class="task-text">${orderKanji[i] || '•'} ${t.name}</span>
+            </div>
+          `).join('');
+        }
+      }
+    }
+
+    async function loadDynamicTasks() {
+      if (isTaskSyncing) return;
+      try {
+        const res = await fetch('tasks.json?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        applyTaskData(data);
+      } catch (err) {
+        console.warn('动态待办加载异常:', err);
+      }
+    }
+
+    // ── 4.6 全双工跨屏气泡共振监听 (QQ 发消息 -> 桌面 Live2D 抬头打字同步) ──
+    let lastBubbleTimestamp = 0;
+
+    async function pollIncomingBubble() {
+      try {
+        const res = await fetch('/api/chat/bubble?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.text && data.timestamp && data.timestamp > lastBubbleTimestamp) {
+          if (lastBubbleTimestamp === 0) {
+            // 初次载入只同步时间戳，避免刷新页面时重复触发历史气泡
+            lastBubbleTimestamp = data.timestamp;
+            return;
+          }
+          lastBubbleTimestamp = data.timestamp;
+          const motion = data.motion !== undefined ? data.motion : 2;
+          playCompanionMotion('Idle', motion);
+          triggerSpeech(data.text, motion);
+        }
+      } catch (e) {}
+    }
+
+    // ── 5. 阶段三 Option A：光感状态轮询与纯黑夜间模式切换 ──
+    async function pollAmbientState() {
+      try {
+        const res = await fetch('ambient_state.json?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        const overlay = document.getElementById('ambient-night-overlay');
+        const nightClock = document.getElementById('night-clock-text');
+
+        if (overlay) {
+          if (isSilenced || data.mode === 'sleep' || data.is_dark) {
+            overlay.classList.add('sleep-active');
+            if (nightClock) {
+              const now = new Date();
+              nightClock.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            }
+          } else {
+            overlay.classList.remove('sleep-active');
+          }
+        }
+      } catch (err) {
+        // 静默处理轮询异常
+      }
+    }
+
+    // ── 6. 手动离席静默开关 (Manual Silence Controller) ──
+    let isSilenced = false;
+    let toastTimeout = null;
+
+    function showSilenceToast(msg, icon = '🌙') {
+      const toast = document.getElementById('silence-toast');
+      const iconEl = document.getElementById('silence-toast-icon');
+      const textEl = document.getElementById('silence-toast-text');
+      if (!toast) return;
+      if (iconEl) iconEl.textContent = icon;
+      if (textEl) textEl.textContent = msg;
+      toast.classList.add('show');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2600);
+    }
+
+    async function toggleManualSilence(wantScreenDim = true) {
+      const targetState = !isSilenced;
+      applySilenceState(targetState);
+      showSilenceToast(targetState ? '已开启离席静默 · 黑屏断光休眠' : '已恢复伴读专注 · 欢迎回来', targetState ? '🌙' : '☀️');
+
+      try {
+        const res = await fetch('/api/silence/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ silenced: targetState, screen_dim: wantScreenDim })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.silenced !== undefined && data.silenced !== isSilenced) {
+            applySilenceState(data.silenced);
+          }
+        }
+      } catch (err) {
+        console.warn('同步离席静默状态至后端失败:', err);
+      }
+    }
+
+    function applySilenceState(silenced) {
+      isSilenced = !!silenced;
+      const badge = document.getElementById('silence-toggle-badge');
+      const badgeText = document.getElementById('silence-badge-text');
+      const topBtn = document.getElementById('silence-btn');
+      const overlay = document.getElementById('ambient-night-overlay');
+      const hintText = document.getElementById('night-hint-text');
+
+      if (isSilenced) {
+        if (badge) badge.classList.add('silenced');
+        if (badgeText) badgeText.textContent = '🌙 离席静默中 · 点击恢复';
+        if (topBtn) {
+          topBtn.classList.add('active-silence');
+          topBtn.textContent = '☀️ 恢复伴读';
+        }
+        if (hintText) hintText.textContent = '· 离席休眠静默 · 点击屏幕任意处唤醒 ·';
+
+        // 立即激活黑屏遮罩与暗夜时钟
+        if (overlay) {
+          overlay.classList.add('sleep-active');
+          const nightClock = document.getElementById('night-clock-text');
+          if (nightClock) {
+            const now = new Date();
+            nightClock.textContent = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          }
+        }
+
+        // 隐藏对白气泡并停止打字
+        if (bubbleWrap) bubbleWrap.classList.remove('visible');
+        if (bubbleTimeout) clearTimeout(bubbleTimeout);
+        if (typeInterval) clearInterval(typeInterval);
+
+        // 彻底停止一切动作并暂停渲染器 Ticker
+        if (live2dModel && live2dModel.internalModel) {
+          try {
+            if (live2dModel.internalModel.motionManager) {
+              live2dModel.internalModel.motionManager.stopAllMotions();
+            }
+            const core = live2dModel.internalModel.coreModel;
+            if (core) {
+              core.setParameterValueById('ParamEyeLOpen', 0.0);
+              core.setParameterValueById('ParamEyeROpen', 0.0);
+              core.setParameterValueById('ParamMouthOpenY', 0.0);
+              core.setParameterValueById('ParamAngleY', -6.0);
+            }
+          } catch(e) {}
+        }
+        if (pixiApp && pixiApp.ticker) {
+          try { pixiApp.ticker.stop(); } catch(e) {}
+        }
+      } else {
+        if (badge) badge.classList.remove('silenced');
+        if (badgeText) badgeText.textContent = 'Echo 桌前伴侣 · 静音专注中';
+        if (topBtn) {
+          topBtn.classList.remove('active-silence');
+          topBtn.textContent = '🌙 离席静默';
+        }
+        if (overlay) overlay.classList.remove('sleep-active');
+
+        // 恢复 Pixi Ticker 与动作系统
+        if (pixiApp && pixiApp.ticker) {
+          try {
+            lastTime = Date.now();
+            pixiApp.ticker.start();
+          } catch(e) {}
+        }
+
+        // 睁开眼睛并触发温情唤醒对白
+        if (live2dModel && live2dModel.internalModel && live2dModel.internalModel.coreModel) {
+          try {
+            const core = live2dModel.internalModel.coreModel;
+            core.setParameterValueById('ParamEyeLOpen', 1.0);
+            core.setParameterValueById('ParamEyeROpen', 1.0);
+            core.setParameterValueById('ParamAngleY', 0.0);
+          } catch(e) {}
+        }
+        triggerSpeech('欢迎回来，wenbo~ 伴读已就绪！', 2);
+      }
+    }
+
+    function handleNightOverlayClick() {
+      // 点击黑屏休眠遮罩任意处均可一键唤醒
+      toggleManualSilence(true);
+    }
+
+    async function pollSilenceState() {
+      try {
+        const res = await fetch('/api/silence?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.silenced !== undefined && data.silenced !== isSilenced) {
+          applySilenceState(data.silenced);
+        }
+      } catch(e) {}
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       initLive2D();
       updateTaskProgress(false);
+      loadDynamicTasks();
+      setInterval(loadDynamicTasks, 15000);
+      // 5 分钟撤销缓冲期自动刷新，平滑顺延补位
+      setInterval(() => {
+        if (lastLoadedTaskData && !isTaskSyncing) {
+          applyTaskData(lastLoadedTaskData);
+        }
+      }, 10000);
+      pollAmbientState();
+      setInterval(pollAmbientState, 3000);
+      pollSilenceState();
+      setInterval(pollSilenceState, 4000);
+      // 全双工跨屏气泡共振监听
+      pollIncomingBubble();
+      setInterval(pollIncomingBubble, 1500);
     });
   </script>
+
+  <!-- 轻量 Toast 浮窗 -->
+  <div id="silence-toast">
+    <span id="silence-toast-icon">🌙</span>
+    <span id="silence-toast-text">已切换模式</span>
+  </div>
 </body>
 </html>

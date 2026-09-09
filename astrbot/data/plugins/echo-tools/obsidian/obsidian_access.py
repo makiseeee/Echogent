@@ -17,7 +17,7 @@ class AccessMode(StrEnum):
     ARCHIVE_ON_DEMAND = "archive_on_demand"
 
 
-STANDARD_ROOTS = frozenset({"1. Projects", "3. Resources", "5. Note"})
+STANDARD_ROOTS = frozenset({"1. Projects", "3. Resources", "3. Knowledge", "5. Note"})
 PRIVATE_ROOTS = frozenset({"2. Areas"})
 ARCHIVE_ROOTS = frozenset({"4. Archives"})
 DENIED_DIRECTORIES = frozenset(
@@ -114,15 +114,15 @@ class VaultAccessPolicy:
 
         top_level = parts[0]
         if top_level in STANDARD_ROOTS:
-            if mode is not AccessMode.STANDARD:
+            if mode != AccessMode.STANDARD:
                 raise PermissionError("访问模式与普通笔记目录不匹配")
             return
         if top_level in PRIVATE_ROOTS:
-            if mode is not AccessMode.PRIVATE_ON_DEMAND:
+            if mode != AccessMode.PRIVATE_ON_DEMAND:
                 raise PermissionError("个人区域仅允许私聊按需访问")
             return
         if top_level in ARCHIVE_ROOTS:
-            if mode is not AccessMode.ARCHIVE_ON_DEMAND:
+            if mode != AccessMode.ARCHIVE_ON_DEMAND:
                 raise PermissionError("归档仅允许明确按需访问")
             return
         raise PermissionError("路径不在允许的 Obsidian 目录中")

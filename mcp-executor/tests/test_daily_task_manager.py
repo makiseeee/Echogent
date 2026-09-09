@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 import subprocess
+
+_ECHO_TOOLS_DIR = Path(__file__).resolve().parents[2] / "astrbot" / "data" / "plugins" / "echo-tools"
+_ECHO_OBSIDIAN_DIR = _ECHO_TOOLS_DIR / "obsidian"
+if str(_ECHO_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(_ECHO_TOOLS_DIR))
+if str(_ECHO_OBSIDIAN_DIR) not in sys.path:
+    sys.path.insert(0, str(_ECHO_OBSIDIAN_DIR))
 
 from daily_task_manager import DailyTaskManager, TaskAmbiguityError
 from obsidian_git import VaultGitSync
@@ -49,8 +57,8 @@ class DailyTaskManagerTests(unittest.TestCase):
         self.manager.ingest_task("普通任务", "2026-09-05")
         recurring = self.manager.ingest_task("每天喝水", is_recurring=True, cycle_rule="每天")
         first = self.manager.morning_dispatch("2026-08-26", max_tasks=1)
-        self.assertEqual([item["id"] for item in first["one_time"]], [overdue])
-        self.assertEqual([item["id"] for item in first["recurring"]], [recurring])
+        self.assertEqual([item["id"] for item in first["one_time"]], [overdue["task_id"]])
+        self.assertEqual([item["id"] for item in first["recurring"]], [recurring["task_id"]])
         self.assertTrue(self.manager.morning_dispatch("2026-08-26")["already_dispatched"])
         self.assertTrue(self.manager.toggle_daily_task("过期" , date_str="2026-08-26"))
         self.manager.append_thino("午饭", "2026-08-26")
@@ -68,7 +76,8 @@ class DailyTaskManagerTests(unittest.TestCase):
             self.manager.toggle_daily_task("写报告", date_str="2026-08-26")
 
     def test_unfinished_one_time_requeues_but_recurring_does_not(self):
-        task_id = self.manager.ingest_task("未完成任务", "2026-08-30")
+        res = self.manager.ingest_task("未完成任务", "2026-08-30")
+        task_id = res["task_id"]
         self.manager.ingest_task("每日习惯", is_recurring=True, cycle_rule="每天")
         self.manager.morning_dispatch("2026-08-26", max_tasks=3)
         recap = self.manager.evening_recap_and_requeue("2026-08-26")

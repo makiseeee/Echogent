@@ -10,23 +10,41 @@ from typing import Any
 
 import aiohttp
 from core.compat import ProviderRequest, logger
-
 from core.config import PluginConfig
+from core.event_bus import EventBus, PCActivityEvent, default_bus
 from core.http_client import HttpClient
 
 
 class PCProber:
     """负责 PC 在线探测、活动窗口采集、口语化转换与情境提示词注入。"""
 
-    def __init__(self, config: PluginConfig) -> None:
+    def __init__(self, config: PluginConfig, bus: EventBus | None = None) -> None:
         self.config = config
+        self.bus = bus or default_bus
         self.online = False
         self.detail = ""
         self.activity: dict[str, Any] = {}
         self.last_probe_ts = 0.0
 
+    async def _notify_if_changed(self, prev_online: bool, prev_activity: dict[str, Any]) -> None:
+        if (self.online != prev_online) or (self.activity != prev_activity):
+            await self.bus.publish(
+                PCActivityEvent(
+                    online=self.online,
+                    app=str(self.activity.get("app", "") or ""),
+                    category=str(self.activity.get("category", "") or ""),
+                    window_title=str(self.activity.get("window_title", "") or ""),
+                    duration_minutes=int(self.activity.get("duration_minutes", 0) or 0),
+                    idle_seconds=int(self.activity.get("idle_seconds", 0) or 0),
+                    is_locked=bool(self.activity.get("is_locked", False)),
+                )
+            )
+
     async def probe_computer(self, timeout_sec: float = 2.0) -> tuple[bool, str]:
         """优先探测台式机 PC Agent，获取前台实时活动与状态。"""
+        prev_online = self.online
+        prev_activity = dict(self.activity)
+
         host = os.environ.get("ECHO_PC_AGENT_HOST", "10.144.232.236")
         port = int(os.environ.get("ECHO_PC_AGENT_PORT", "8766"))
         pc_agent_url = f"http://{host}:{port}/api/pc/activity?level=detail"
@@ -45,6 +63,7 @@ class PCProber:
                         app = payload.get("app", "")
                         summary = payload.get("summary", "")
                         self.detail = f"{app} ({summary})"
+                        await self._notify_if_changed(prev_online, prev_activity)
                         return True, self.detail
         except Exception as exc:
             logger.debug(f"[PCProber] 探测 PC Agent 异常: {exc}")
@@ -68,6 +87,8 @@ class PCProber:
             self.detail = mcp_detail
             if not mcp_online:
                 self.activity = {}
+
+        await self._notify_if_changed(prev_online, prev_activity)
         return self.online, self.detail
 
     async def background_prober_loop(self) -> None:

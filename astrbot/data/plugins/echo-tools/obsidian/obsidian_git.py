@@ -43,6 +43,7 @@ class VaultGitSync:
         timeout_seconds: int = 30,
         username: str = "",
         token: str = "",
+        async_push: bool = False,
     ):
         self.vault = Path(vault).resolve()
         self.remote = remote
@@ -50,6 +51,7 @@ class VaultGitSync:
         self.timeout_seconds = max(5, int(timeout_seconds))
         self.username = username
         self.token = token
+        self.async_push = bool(async_push)
         self._lock = threading.Lock()
         self._last_pull_time: float = 0.0
         self._pull_cache_ttl: float = 60.0
@@ -155,13 +157,40 @@ class VaultGitSync:
                     success=False, changed=True, pull_warning=pull_warning, error=error
                 )
 
-            # Fire async push worker immediately so chat response is instantaneous
-            threading.Thread(target=self._async_push_worker, daemon=True).start()
+            if self.async_push:
+                # Fire async push worker immediately so chat response is instantaneous
+                threading.Thread(target=self._async_push_worker, daemon=True).start()
+                return value, GitSyncResult(
+                    success=True, changed=True, committed=True, pushed=True,
+                    pull_warning=pull_warning,
+                )
 
-            return value, GitSyncResult(
-                success=True, changed=True, committed=True, pushed=True,
-                pull_warning=pull_warning,
-            )
+            try:
+                self._git("push", self.remote, self.branch)
+                return value, GitSyncResult(
+                    success=True, changed=True, committed=True, pushed=True,
+                    pull_warning=pull_warning,
+                )
+            except (subprocess.SubprocessError, OSError) as exc:
+                warning = self._message(exc)
+                if "non-fast-forward" in warning.lower() or "rejected" in warning.lower():
+                    ok, retry_warning = self._pull_unlocked(force=True)
+                    if ok:
+                        try:
+                            self._git("push", self.remote, self.branch)
+                            return value, GitSyncResult(
+                                success=True, changed=True, committed=True, pushed=True,
+                                pull_warning=pull_warning,
+                            )
+                        except (subprocess.SubprocessError, OSError) as retry_exc:
+                            warning = self._message(retry_exc)
+                    elif retry_warning:
+                        warning = f"{warning}; rebase retry: {retry_warning}"
+                LOG.warning("Obsidian git push failed; commit kept locally: %s", warning)
+                return value, GitSyncResult(
+                    success=True, changed=True, committed=True, pushed=False,
+                    pull_warning=pull_warning, push_warning=warning,
+                )
 
     def atomic_transaction(self, action_func: Callable[[], T], commit_message: str) -> tuple[T, GitSyncResult]:
         """Alias documenting that action_func may modify multiple files atomically."""

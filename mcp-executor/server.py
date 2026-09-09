@@ -26,13 +26,21 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from obsidian_access import AccessMode, VaultAccessPolicy
-from obsidian_search import list_notes, read_note_excerpt, search_vault
-from obsidian_write import NoteWriteService
-from daily_task_manager import DailyTaskManager, TaskAmbiguityError
-
-
 BASE_DIR = Path(__file__).resolve().parent
+ECHO_TOOLS_DIR = BASE_DIR.parent / "astrbot" / "data" / "plugins" / "echo-tools"
+if str(ECHO_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(ECHO_TOOLS_DIR))
+
+from obsidian import (
+    AccessMode,
+    DailyTaskManager,
+    NoteWriteService,
+    TaskAmbiguityError,
+    VaultAccessPolicy,
+    list_notes,
+    read_note_excerpt,
+    search_vault,
+)
 RUNNER_PATH = BASE_DIR / "sandbox_runner.py"
 DEFAULT_WORKSPACE = BASE_DIR / "workspace"
 MAX_CODE_CHARS = 20_000
