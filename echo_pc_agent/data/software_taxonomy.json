@@ -1,0 +1,1293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "generated_at": "2026-09-09",
+  "description": "Echo PC Agent Windows 软件白名单分类与全景特征映射库",
+  "categories": {
+    "coding": {
+      "name": "研发与代码工程",
+      "subcategories": {
+        "ide_editor": {
+          "name": "智能集成开发环境与代码编辑器",
+          "visual_safe": true,
+          "default_summary": "正在编写与调试代码",
+          "apps": [
+            {
+              "exe": "antigravity.exe",
+              "name": "Antigravity",
+              "tags": [
+                "ide",
+                "ai_pair"
+              ]
+            },
+            {
+              "exe": "cursor.exe",
+              "name": "Cursor",
+              "tags": [
+                "ide",
+                "ai_pair"
+              ]
+            },
+            {
+              "exe": "code.exe",
+              "name": "Visual Studio Code",
+              "tags": [
+                "ide",
+                "editor"
+              ]
+            },
+            {
+              "exe": "pycharm64.exe",
+              "name": "PyCharm",
+              "tags": [
+                "ide",
+                "python"
+              ]
+            },
+            {
+              "exe": "devenv.exe",
+              "name": "Visual Studio",
+              "tags": [
+                "ide",
+                "cpp",
+                "csharp"
+              ]
+            },
+            {
+              "exe": "cpeditor.exe",
+              "name": "CP Editor",
+              "tags": [
+                "algorithm",
+                "competitive"
+              ]
+            },
+            {
+              "exe": "notepad++.exe",
+              "name": "Notepad++",
+              "tags": [
+                "editor",
+                "text"
+              ]
+            },
+            {
+              "exe": "gvim.exe",
+              "name": "Vim",
+              "tags": [
+                "editor",
+                "terminal"
+              ]
+            }
+          ]
+        },
+        "terminal_env": {
+          "name": "终端与系统环境",
+          "visual_safe": true,
+          "default_summary": "正在终端控制台执行运维与编译指令",
+          "apps": [
+            {
+              "exe": "windowsterminal.exe",
+              "name": "Windows Terminal",
+              "tags": [
+                "terminal"
+              ]
+            },
+            {
+              "exe": "wt.exe",
+              "name": "Windows Terminal",
+              "tags": [
+                "terminal"
+              ]
+            },
+            {
+              "exe": "pwsh.exe",
+              "name": "PowerShell 7",
+              "tags": [
+                "shell"
+              ]
+            },
+            {
+              "exe": "powershell.exe",
+              "name": "Windows PowerShell",
+              "tags": [
+                "shell"
+              ]
+            },
+            {
+              "exe": "cmd.exe",
+              "name": "命令提示符",
+              "tags": [
+                "shell"
+              ]
+            },
+            {
+              "exe": "wsl.exe",
+              "name": "WSL 2",
+              "tags": [
+                "linux",
+                "subsystem"
+              ]
+            },
+            {
+              "exe": "ubuntu.exe",
+              "name": "Ubuntu Linux",
+              "tags": [
+                "linux"
+              ]
+            },
+            {
+              "exe": "mintty.exe",
+              "name": "Cygwin Terminal",
+              "tags": [
+                "terminal"
+              ]
+            }
+          ]
+        },
+        "vcs_remote": {
+          "name": "版本控制与远程传输",
+          "visual_safe": true,
+          "default_summary": "正在同步代码库或传输文件",
+          "apps": [
+            {
+              "exe": "git.exe",
+              "name": "Git",
+              "tags": [
+                "vcs"
+              ]
+            },
+            {
+              "exe": "git-bash.exe",
+              "name": "Git Bash",
+              "tags": [
+                "vcs",
+                "shell"
+              ]
+            },
+            {
+              "exe": "winscp.exe",
+              "name": "WinSCP",
+              "tags": [
+                "sftp",
+                "remote"
+              ]
+            },
+            {
+              "exe": "filezilla.exe",
+              "name": "FileZilla FTP",
+              "tags": [
+                "ftp",
+                "remote"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "hardware_embedded": {
+      "name": "嵌入式开发与硬件 EDA",
+      "subcategories": {
+        "mcu_embedded": {
+          "name": "单片机与固件开发",
+          "visual_safe": true,
+          "default_summary": "正在进行单片机嵌入式开发与固件烧录",
+          "apps": [
+            {
+              "exe": "uv4.exe",
+              "name": "Keil uVision5",
+              "tags": [
+                "mcu",
+                "arm",
+                "stm32"
+              ]
+            },
+            {
+              "exe": "stm32cubemax.exe",
+              "name": "STM32CubeMX",
+              "tags": [
+                "stm32",
+                "pinout"
+              ]
+            },
+            {
+              "exe": "arduino.exe",
+              "name": "Arduino IDE",
+              "tags": [
+                "arduino",
+                "iot"
+              ]
+            },
+            {
+              "exe": "arduino-builder.exe",
+              "name": "Arduino Builder",
+              "tags": [
+                "arduino"
+              ]
+            }
+          ]
+        },
+        "eda_circuit": {
+          "name": "原理图与 PCB 电路设计",
+          "visual_safe": true,
+          "default_summary": "正在设计电路原理图与 PCB 布线",
+          "apps": [
+            {
+              "exe": "lceda-pro.exe",
+              "name": "嘉立创 EDA 专业版",
+              "tags": [
+                "eda",
+                "pcb"
+              ]
+            },
+            {
+              "exe": "waveforms.exe",
+              "name": "Digilent WaveForms",
+              "tags": [
+                "eda",
+                "logic_analyzer"
+              ]
+            }
+          ]
+        },
+        "instrumentation": {
+          "name": "虚拟仪器与测控自动化",
+          "visual_safe": true,
+          "default_summary": "正在使用 LabVIEW 进行测控系统配置与自动化测试",
+          "apps": [
+            {
+              "exe": "labview.exe",
+              "name": "NI LabVIEW 2018",
+              "tags": [
+                "labview",
+                "vi"
+              ]
+            },
+            {
+              "exe": "nimax.exe",
+              "name": "NI MAX",
+              "tags": [
+                "measurement",
+                "instruments"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "research_simulation": {
+      "name": "科学计算、多物理场仿真与学术科研",
+      "subcategories": {
+        "scientific_computing": {
+          "name": "数值计算与物理场仿真",
+          "visual_safe": true,
+          "default_summary": "正在运行科学计算数值分析与工程仿真",
+          "apps": [
+            {
+              "exe": "matlab.exe",
+              "name": "MATLAB",
+              "tags": [
+                "math",
+                "numerical"
+              ]
+            },
+            {
+              "exe": "simulink.exe",
+              "name": "Simulink",
+              "tags": [
+                "simulation",
+                "control"
+              ]
+            },
+            {
+              "exe": "sldworks.exe",
+              "name": "SolidWorks",
+              "tags": [
+                "cad",
+                "3d"
+              ]
+            },
+            {
+              "exe": "cst_design_environment.exe",
+              "name": "CST Studio Suite",
+              "tags": [
+                "em",
+                "simulation"
+              ]
+            },
+            {
+              "exe": "cst_design_environment_gui.exe",
+              "name": "CST Studio Suite",
+              "tags": [
+                "em",
+                "simulation"
+              ]
+            },
+            {
+              "exe": "operafea-manager.exe",
+              "name": "Opera FEA Manager",
+              "tags": [
+                "fea",
+                "em"
+              ]
+            },
+            {
+              "exe": "operafea-modeller.exe",
+              "name": "Opera FEA Modeller",
+              "tags": [
+                "fea",
+                "em"
+              ]
+            },
+            {
+              "exe": "operafea-post.exe",
+              "name": "Opera FEA Post",
+              "tags": [
+                "fea",
+                "em"
+              ]
+            }
+          ]
+        },
+        "academic_literature": {
+          "name": "学术论文研读与文献管理",
+          "visual_safe": true,
+          "default_summary": "正在研读学术论文与整理学术文献",
+          "apps": [
+            {
+              "exe": "zotero.exe",
+              "name": "Zotero",
+              "tags": [
+                "literature",
+                "papers"
+              ]
+            },
+            {
+              "exe": "mendeley reference manager.exe",
+              "name": "Mendeley",
+              "tags": [
+                "literature",
+                "papers"
+              ]
+            },
+            {
+              "exe": "cajviewer.exe",
+              "name": "CAJViewer",
+              "tags": [
+                "papers",
+                "cnki"
+              ]
+            },
+            {
+              "exe": "noteexpress.exe",
+              "name": "NoteExpress",
+              "tags": [
+                "literature"
+              ]
+            },
+            {
+              "exe": "paperreader.exe",
+              "name": "Paper Reader",
+              "tags": [
+                "pdf",
+                "papers"
+              ]
+            },
+            {
+              "exe": "acrord32.exe",
+              "name": "Adobe Acrobat Reader",
+              "tags": [
+                "pdf",
+                "reader"
+              ]
+            },
+            {
+              "exe": "acrobat.exe",
+              "name": "Adobe Acrobat Pro",
+              "tags": [
+                "pdf",
+                "reader"
+              ]
+            }
+          ]
+        },
+        "academic_writing": {
+          "name": "学术排版、数学与生物信息",
+          "visual_safe": true,
+          "default_summary": "正在推导公式或排版学术论文",
+          "apps": [
+            {
+              "exe": "xelatex.exe",
+              "name": "XeLaTeX",
+              "tags": [
+                "latex",
+                "typeset"
+              ]
+            },
+            {
+              "exe": "pdflatex.exe",
+              "name": "pdfLaTeX",
+              "tags": [
+                "latex",
+                "typeset"
+              ]
+            },
+            {
+              "exe": "mathtype.exe",
+              "name": "MathType",
+              "tags": [
+                "math",
+                "formula"
+              ]
+            },
+            {
+              "exe": "dnaman.exe",
+              "name": "DNAMAN",
+              "tags": [
+                "bioinformatics",
+                "dna"
+              ]
+            }
+          ]
+        },
+        "knowledge_base": {
+          "name": "个人知识库与笔记",
+          "visual_safe": true,
+          "default_summary": "正在整理个人笔记与知识库",
+          "apps": [
+            {
+              "exe": "obsidian.exe",
+              "name": "Obsidian",
+              "tags": [
+                "notes",
+                "pkm",
+                "markdown"
+              ]
+            },
+            {
+              "exe": "typora.exe",
+              "name": "Typora",
+              "tags": [
+                "markdown",
+                "editor"
+              ]
+            },
+            {
+              "exe": "xmind.exe",
+              "name": "Xmind",
+              "tags": [
+                "mindmap",
+                "brainstorm"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "creative_design": {
+      "name": "数字影音制作与创意设计",
+      "subcategories": {
+        "music_daw": {
+          "name": "音乐编曲与数字音频工作站",
+          "visual_safe": true,
+          "default_summary": "正在制作音频编曲混音",
+          "apps": [
+            {
+              "exe": "reaper.exe",
+              "name": "REAPER",
+              "tags": [
+                "daw",
+                "audio",
+                "music"
+              ]
+            },
+            {
+              "exe": "audacity.exe",
+              "name": "Audacity",
+              "tags": [
+                "audio",
+                "editor"
+              ]
+            },
+            {
+              "exe": "vocaloid5.exe",
+              "name": "VOCALOID 5",
+              "tags": [
+                "vocaloid",
+                "synthesizer"
+              ]
+            }
+          ]
+        },
+        "video_production": {
+          "name": "影视剪辑、调色与推流录屏",
+          "visual_safe": true,
+          "default_summary": "正在剪辑视频或录制屏幕",
+          "apps": [
+            {
+              "exe": "resolve.exe",
+              "name": "DaVinci Resolve",
+              "tags": [
+                "video",
+                "color_grading"
+              ]
+            },
+            {
+              "exe": "obs64.exe",
+              "name": "OBS Studio",
+              "tags": [
+                "streaming",
+                "recording"
+              ]
+            }
+          ]
+        },
+        "graphic_3d": {
+          "name": "矢量平面设计与 3D 打印",
+          "visual_safe": true,
+          "default_summary": "正在绘制矢量图形或进行 3D 打印切片",
+          "apps": [
+            {
+              "exe": "illustrator.exe",
+              "name": "Adobe Illustrator",
+              "tags": [
+                "vector",
+                "design"
+              ]
+            },
+            {
+              "exe": "bambu-studio.exe",
+              "name": "Bambu Studio",
+              "tags": [
+                "3d_printing",
+                "slicer"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "gaming": {
+      "name": "游戏竞技与数字休闲",
+      "subcategories": {
+        "competitive_fps_moba": {
+          "name": "竞技射击与 MOBA",
+          "visual_safe": true,
+          "dnd_inhibit": true,
+          "default_summary": "正在沉浸高强度竞技对局中",
+          "apps": [
+            {
+              "exe": "cs2.exe",
+              "name": "Counter-Strike 2",
+              "tags": [
+                "fps",
+                "tactical"
+              ]
+            },
+            {
+              "exe": "r5apex_dx12.exe",
+              "name": "Apex Legends",
+              "tags": [
+                "fps",
+                "battle_royale"
+              ]
+            },
+            {
+              "exe": "r5apex.exe",
+              "name": "Apex Legends",
+              "tags": [
+                "fps",
+                "battle_royale"
+              ]
+            },
+            {
+              "exe": "tslgame.exe",
+              "name": "PUBG",
+              "tags": [
+                "fps",
+                "battle_royale"
+              ]
+            },
+            {
+              "exe": "leagueclientux.exe",
+              "name": "英雄联盟",
+              "tags": [
+                "moba"
+              ]
+            },
+            {
+              "exe": "league of legends.exe",
+              "name": "英雄联盟",
+              "tags": [
+                "moba"
+              ]
+            }
+          ]
+        },
+        "action_rpg_souls": {
+          "name": "大型 3A、魂系与动作冒险",
+          "visual_safe": true,
+          "dnd_inhibit": true,
+          "default_summary": "正在沉浸式探索大型动作冒险世界",
+          "apps": [
+            {
+              "exe": "eldenring.exe",
+              "name": "艾尔登法环 (Elden Ring)",
+              "tags": [
+                "arpg",
+                "souls"
+              ]
+            },
+            {
+              "exe": "diablo iv.exe",
+              "name": "暗黑破坏神 IV",
+              "tags": [
+                "arpg",
+                "hack_and_slash"
+              ]
+            },
+            {
+              "exe": "ds.exe",
+              "name": "死亡搁浅 (Death Stranding)",
+              "tags": [
+                "open_world",
+                "story"
+              ]
+            },
+            {
+              "exe": "nierautomata.exe",
+              "name": "尼尔：机械纪元",
+              "tags": [
+                "arpg",
+                "story"
+              ]
+            },
+            {
+              "exe": "p5r.exe",
+              "name": "女神异闻录 5 皇家版",
+              "tags": [
+                "jrpg"
+              ]
+            },
+            {
+              "exe": "deadcells.exe",
+              "name": "死亡细胞 (Dead Cells)",
+              "tags": [
+                "roguelike",
+                "metroidvania"
+              ]
+            },
+            {
+              "exe": "gunfire reborn.exe",
+              "name": "枪火重生 (Gunfire Reborn)",
+              "tags": [
+                "roguelike",
+                "fps"
+              ]
+            },
+            {
+              "exe": "risk of rain 2.exe",
+              "name": "雨中冒险 2",
+              "tags": [
+                "roguelike",
+                "tps"
+              ]
+            },
+            {
+              "exe": "hollow_knight.exe",
+              "name": "空洞骑士 (Hollow Knight)",
+              "tags": [
+                "metroidvania"
+              ]
+            }
+          ]
+        },
+        "touhou_indie": {
+          "name": "东方 Project 与同人独立佳作",
+          "visual_safe": true,
+          "dnd_inhibit": false,
+          "default_summary": "正在体验东方 Project 弹幕或同人独立游戏",
+          "apps": [
+            {
+              "exe": "thmhj.exe",
+              "name": "东方幕华祭",
+              "tags": [
+                "touhou",
+                "shmup"
+              ]
+            },
+            {
+              "exe": "touhou mystia izakaya.exe",
+              "name": "东方夜雀食堂",
+              "tags": [
+                "touhou",
+                "simulation"
+              ]
+            },
+            {
+              "exe": "th08.exe",
+              "name": "东方永夜抄",
+              "tags": [
+                "touhou",
+                "danmaku"
+              ]
+            },
+            {
+              "exe": "th11.exe",
+              "name": "东方地灵殿",
+              "tags": [
+                "touhou",
+                "danmaku"
+              ]
+            },
+            {
+              "exe": "th11c.exe",
+              "name": "东方地灵殿 (汉化版)",
+              "tags": [
+                "touhou",
+                "danmaku"
+              ]
+            },
+            {
+              "exe": "th16.exe",
+              "name": "东方天空璋",
+              "tags": [
+                "touhou",
+                "danmaku"
+              ]
+            },
+            {
+              "exe": "th16c.exe",
+              "name": "东方天空璋 (汉化版)",
+              "tags": [
+                "touhou",
+                "danmaku"
+              ]
+            },
+            {
+              "exe": "th18.exe",
+              "name": "东方虹龙洞",
+              "tags": [
+                "touhou",
+                "danmaku"
+              ]
+            }
+          ]
+        },
+        "sandbox_strategy": {
+          "name": "沙盒建造与大战略",
+          "visual_safe": true,
+          "dnd_inhibit": false,
+          "default_summary": "正在搭建沙盒世界或运筹帷幄大战略",
+          "apps": [
+            {
+              "exe": "plain craft launcher 2.exe",
+              "name": "我的世界 (PCL2)",
+              "tags": [
+                "minecraft",
+                "launcher"
+              ]
+            },
+            {
+              "exe": "javaw.exe",
+              "name": "我的世界 (Minecraft Java)",
+              "tags": [
+                "minecraft",
+                "sandbox"
+              ]
+            },
+            {
+              "exe": "stellaris.exe",
+              "name": "群星 (Stellaris)",
+              "tags": [
+                "4x",
+                "strategy",
+                "paradox"
+              ]
+            },
+            {
+              "exe": "celeste.exe",
+              "name": "蔚蓝 (Celeste)",
+              "tags": [
+                "platformer"
+              ]
+            },
+            {
+              "exe": "vampire survivors.exe",
+              "name": "吸血鬼幸存者",
+              "tags": [
+                "roguelike",
+                "casual"
+              ]
+            }
+          ]
+        },
+        "visual_novel_gal": {
+          "name": "视觉小说与剧情 Galgame",
+          "visual_safe": true,
+          "dnd_inhibit": false,
+          "default_summary": "正在品味视觉小说剧情演出",
+          "apps": [
+            {
+              "exe": "siglusengine.exe",
+              "name": "Rewrite+",
+              "tags": [
+                "key",
+                "visual_novel"
+              ]
+            },
+            {
+              "exe": "rewrite+原版.exe",
+              "name": "Rewrite+",
+              "tags": [
+                "key",
+                "visual_novel"
+              ]
+            },
+            {
+              "exe": "narci2.exe",
+              "name": "水仙 2 (Narcissu 2)",
+              "tags": [
+                "visual_novel"
+              ]
+            },
+            {
+              "exe": "aokana.exe",
+              "name": "苍之彼方的四重奏",
+              "tags": [
+                "visual_novel"
+              ]
+            }
+          ]
+        },
+        "gaming_platform_tools": {
+          "name": "游戏启动器、对战平台与开黑语音",
+          "visual_safe": true,
+          "dnd_inhibit": false,
+          "default_summary": "正在浏览游戏库或在开黑语音准备发车",
+          "apps": [
+            {
+              "exe": "steam.exe",
+              "name": "Steam",
+              "tags": [
+                "platform",
+                "store"
+              ]
+            },
+            {
+              "exe": "5eclient.exe",
+              "name": "5E对战平台",
+              "tags": [
+                "platform",
+                "cs2"
+              ]
+            },
+            {
+              "exe": "perfectworldarena.exe",
+              "name": "完美世界竞技平台",
+              "tags": [
+                "platform",
+                "cs2"
+              ]
+            },
+            {
+              "exe": "wegame.exe",
+              "name": "WeGame",
+              "tags": [
+                "platform"
+              ]
+            },
+            {
+              "exe": "battle.net.exe",
+              "name": "战网 (Battle.net)",
+              "tags": [
+                "platform",
+                "blizzard"
+              ]
+            },
+            {
+              "exe": "epicgameslauncher.exe",
+              "name": "Epic Games Launcher",
+              "tags": [
+                "platform"
+              ]
+            },
+            {
+              "exe": "oopz.exe",
+              "name": "Oopz 开黑语音",
+              "tags": [
+                "voice",
+                "communication"
+              ]
+            },
+            {
+              "exe": "soundpad.exe",
+              "name": "Soundpad",
+              "tags": [
+                "voice",
+                "soundboard"
+              ]
+            },
+            {
+              "exe": "uu.exe",
+              "name": "网易 UU 加速器",
+              "tags": [
+                "booster"
+              ]
+            }
+          ]
+        },
+        "desktop_pet_wallpaper": {
+          "name": "桌面摆件与动态美化",
+          "visual_safe": true,
+          "dnd_inhibit": false,
+          "default_summary": "正在欣赏桌面动态美化",
+          "apps": [
+            {
+              "exe": "vpet-simulator.windows.exe",
+              "name": "VPet 虚拟桌宠",
+              "tags": [
+                "desktop_pet"
+              ]
+            },
+            {
+              "exe": "wallpaper64.exe",
+              "name": "Wallpaper Engine",
+              "tags": [
+                "wallpaper"
+              ]
+            },
+            {
+              "exe": "wallpaper32.exe",
+              "name": "Wallpaper Engine",
+              "tags": [
+                "wallpaper"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "communication_meeting": {
+      "name": "通讯社交、远程会议与学习平台",
+      "subcategories": {
+        "im_chat": {
+          "name": "即时通讯与社群",
+          "visual_safe": false,
+          "dnd_inhibit": false,
+          "default_summary": "正在处理即时聊天与社交消息",
+          "apps": [
+            {
+              "exe": "wechat.exe",
+              "name": "微信",
+              "tags": [
+                "im",
+                "chat"
+              ]
+            },
+            {
+              "exe": "qq.exe",
+              "name": "QQ",
+              "tags": [
+                "im",
+                "chat"
+              ]
+            },
+            {
+              "exe": "telegram.exe",
+              "name": "Telegram",
+              "tags": [
+                "im",
+                "chat"
+              ]
+            },
+            {
+              "exe": "discord.exe",
+              "name": "Discord",
+              "tags": [
+                "im",
+                "chat"
+              ]
+            },
+            {
+              "exe": "wxwork.exe",
+              "name": "企业微信",
+              "tags": [
+                "im",
+                "work"
+              ]
+            }
+          ]
+        },
+        "online_meeting": {
+          "name": "在线会议与课堂直播",
+          "visual_safe": false,
+          "dnd_inhibit": true,
+          "default_summary": "正在进行线上会议或听网课（免打扰）",
+          "apps": [
+            {
+              "exe": "wemeetapp.exe",
+              "name": "腾讯会议",
+              "tags": [
+                "meeting",
+                "video_call"
+              ]
+            },
+            {
+              "exe": "rainclassroom.exe",
+              "name": "雨课堂",
+              "tags": [
+                "classroom",
+                "learning"
+              ]
+            },
+            {
+              "exe": "zoom.exe",
+              "name": "Zoom",
+              "tags": [
+                "meeting"
+              ]
+            },
+            {
+              "exe": "teams.exe",
+              "name": "Microsoft Teams",
+              "tags": [
+                "meeting",
+                "collaboration"
+              ]
+            }
+          ]
+        },
+        "remote_desktop": {
+          "name": "远程协助与内网控制",
+          "visual_safe": false,
+          "dnd_inhibit": false,
+          "default_summary": "正在使用远程桌面连接",
+          "apps": [
+            {
+              "exe": "todesk.exe",
+              "name": "ToDesk",
+              "tags": [
+                "remote",
+                "control"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "productivity_system": {
+      "name": "日常生产力、系统运维与硬件工具",
+      "subcategories": {
+        "office_suite": {
+          "name": "办公套件与文档处理",
+          "visual_safe": true,
+          "default_summary": "正在编辑处理办公文档与表格",
+          "apps": [
+            {
+              "exe": "winword.exe",
+              "name": "Microsoft Word",
+              "tags": [
+                "office",
+                "doc"
+              ]
+            },
+            {
+              "exe": "excel.exe",
+              "name": "Microsoft Excel",
+              "tags": [
+                "office",
+                "sheet"
+              ]
+            },
+            {
+              "exe": "powerpnt.exe",
+              "name": "Microsoft PowerPoint",
+              "tags": [
+                "office",
+                "slide"
+              ]
+            },
+            {
+              "exe": "visio.exe",
+              "name": "Microsoft Visio",
+              "tags": [
+                "office",
+                "diagram"
+              ]
+            },
+            {
+              "exe": "wps.exe",
+              "name": "WPS Office",
+              "tags": [
+                "wps",
+                "doc"
+              ]
+            },
+            {
+              "exe": "wpp.exe",
+              "name": "WPS 演示",
+              "tags": [
+                "wps",
+                "slide"
+              ]
+            },
+            {
+              "exe": "et.exe",
+              "name": "WPS 表格",
+              "tags": [
+                "wps",
+                "sheet"
+              ]
+            },
+            {
+              "exe": "olk.exe",
+              "name": "Outlook",
+              "tags": [
+                "email"
+              ]
+            }
+          ]
+        },
+        "web_browsers": {
+          "name": "网页浏览器",
+          "visual_safe": true,
+          "default_summary": "正在浏览网页资讯",
+          "apps": [
+            {
+              "exe": "chrome.exe",
+              "name": "Google Chrome",
+              "tags": [
+                "browser"
+              ]
+            },
+            {
+              "exe": "msedge.exe",
+              "name": "Microsoft Edge",
+              "tags": [
+                "browser"
+              ]
+            },
+            {
+              "exe": "firefox.exe",
+              "name": "Firefox",
+              "tags": [
+                "browser"
+              ]
+            }
+          ]
+        },
+        "system_utilities": {
+          "name": "系统运维、文件管理与硬件诊断",
+          "visual_safe": true,
+          "default_summary": "正在整理文件或进行系统运维",
+          "apps": [
+            {
+              "exe": "everything.exe",
+              "name": "Everything",
+              "tags": [
+                "search",
+                "utility"
+              ]
+            },
+            {
+              "exe": "bandizip.exe",
+              "name": "Bandizip",
+              "tags": [
+                "archive",
+                "zip"
+              ]
+            },
+            {
+              "exe": "idman.exe",
+              "name": "Internet Download Manager",
+              "tags": [
+                "downloader"
+              ]
+            },
+            {
+              "exe": "baidunetdisk.exe",
+              "name": "百度网盘",
+              "tags": [
+                "cloud_storage"
+              ]
+            },
+            {
+              "exe": "thunder.exe",
+              "name": "迅雷",
+              "tags": [
+                "downloader"
+              ]
+            },
+            {
+              "exe": "potplayer64.exe",
+              "name": "PotPlayer",
+              "tags": [
+                "media_player"
+              ]
+            },
+            {
+              "exe": "potplayermini64.exe",
+              "name": "PotPlayer",
+              "tags": [
+                "media_player"
+              ]
+            },
+            {
+              "exe": "cloudmusic.exe",
+              "name": "网易云音乐",
+              "tags": [
+                "music_player"
+              ]
+            },
+            {
+              "exe": "partassist.exe",
+              "name": "AOMEI Partition Assistant",
+              "tags": [
+                "disk"
+              ]
+            },
+            {
+              "exe": "spacesniffer.exe",
+              "name": "SpaceSniffer",
+              "tags": [
+                "disk",
+                "cleanup"
+              ]
+            },
+            {
+              "exe": "crystaldiskinfo.exe",
+              "name": "CrystalDiskInfo",
+              "tags": [
+                "hardware",
+                "smart"
+              ]
+            },
+            {
+              "exe": "zerotier-one_x64.exe",
+              "name": "ZeroTier One",
+              "tags": [
+                "vpn",
+                "network"
+              ]
+            },
+            {
+              "exe": "clash for windows.exe",
+              "name": "Clash for Windows",
+              "tags": [
+                "proxy",
+                "network"
+              ]
+            },
+            {
+              "exe": "oemdrv.exe",
+              "name": "AULA F87 PRO 键盘驱动",
+              "tags": [
+                "peripheral",
+                "keyboard"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
