@@ -10,6 +10,7 @@ Provides:
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -161,6 +163,103 @@ _latest_bubble = {
 }
 
 
+def get_zhipu_api_key() -> str:
+    env_k = os.environ.get("ZHIPUAI_API_KEY", "").strip() or os.environ.get("ECHO_ZHIPU_API_KEY", "").strip()
+    if env_k:
+        return env_k
+    for p in [Path("/data/data/com.termux/files/home/cmd_config.json"), Path("/opt/echo/data/cmd_config.json")]:
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                for s in data.get("provider_sources", []):
+                    if "zhipu" in s.get("id", "").lower() or "bigmodel" in s.get("api_base", "").lower():
+                        keys = s.get("key", [])
+                        if keys and keys[0]:
+                            return str(keys[0]).strip()
+            except Exception:
+                pass
+    return ""
+
+
+def execute_hud_glance() -> str:
+    # 1. 查询 PC 前台活动
+    pc = {}
+    for url in ["http://10.144.232.236:8766/api/pc/activity?level=summary", "http://127.0.0.1:8766/api/pc/activity?level=summary"]:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "EchoHUD/1.0"})
+            with urllib.request.urlopen(req, timeout=1.2) as resp:
+                if resp.status == 200:
+                    pc = json.loads(resp.read().decode("utf-8"))
+                    break
+        except Exception:
+            pass
+
+    if pc.get("privacy_mode"):
+        return "文博开启了隐私模式，伴读不偷看哦~"
+
+    # 2. 前置相机 0.2s 瞬态抓拍
+    tmp_path = "/data/data/com.termux/files/home/.echo/hud_glance_tmp.jpg"
+    cam_bin = "/data/data/com.termux/files/usr/bin/termux-camera-photo"
+    b64_img = ""
+    if os.path.exists(cam_bin):
+        res = subprocess.run([cam_bin, "-c", "1", tmp_path], capture_output=True, timeout=8)
+        if res.returncode == 0 and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            with open(tmp_path, "rb") as f:
+                b64_img = base64.b64encode(f.read()).decode("utf-8")
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+    api_key = get_zhipu_api_key()
+    app = pc.get("app", "电脑") if pc else "电脑"
+    if not b64_img or not api_key:
+        return f"电脑上明明正开着【{app}】呢，少让我猜啦~"
+
+    cat = pc.get("category", "")
+    dur = pc.get("duration_minutes", 0)
+    summ = pc.get("summary", "")
+
+    system_instruction = (
+        "你叫 Echo，是住在文博书桌旁日系手帐看板里的小伴读（傲娇、嘴硬心软、观察敏锐的小女友口吻）。\n"
+        "你正在通过工位手机前置摄像头偷瞄桌前的文博，并结合了他电脑前台的实时活动。\n"
+        f"【电脑状态】：应用={app}，类别={cat}，专注时长={dur}分钟，窗口摘要={summ}。\n"
+        "【输出硬性要求】：\n"
+        "1. 必须根据眼前工位照片中的真实细节（文博姿态如戴耳机、托腮、揉眼；桌面水杯、饮料、外卖等）直接调侃；\n"
+        "2. 结合电脑正在做的事自然融合，限 1~2 句话（45 字以内），口语化；\n"
+        "3. 称呼他为文博，严禁出现'照片显示'、'图片中'等生硬字眼！直接像肉眼看见一样说出来。"
+    )
+
+    data = {
+        "model": "glm-4v-flash",
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": [
+                {"type": "text", "text": "偷瞄一眼文博现在的工位状态，用你的口吻直接说他现在在干嘛："},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
+            ]}
+        ],
+        "temperature": 0.4,
+        "max_tokens": 128
+    }
+
+    try:
+        req = urllib.request.Request(
+            "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            data=json.dumps(data).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=12.0) as resp:
+            res_json = json.loads(resp.read().decode("utf-8"))
+            reply = str(res_json.get("choices", [{}])[0].get("message", {}).get("content", "")).strip()
+            if reply:
+                return reply
+    except Exception as exc:
+        LOG.warning("GLM-4V 调用失败: %s", exc)
+
+    return f"电脑上正开着【{app}】呢，当我看不见呀~"
+
+
 class CompanionRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_DIR), **kwargs)
@@ -220,6 +319,19 @@ class CompanionRequestHandler(SimpleHTTPRequestHandler):
 
         if url_path == "/api/chat/bubble":
             self._send_json(200, {"success": True, **_latest_bubble})
+            return
+
+        if url_path == "/api/companion/glance":
+            try:
+                reply = execute_hud_glance()
+                _latest_bubble["text"] = reply
+                _latest_bubble["motion"] = 1
+                _latest_bubble["timestamp"] = time.time()
+                LOG.info("HUD Companion Glance reply: %s", reply[:40])
+                self._send_json(200, {"success": True, "reply": reply})
+            except Exception as exc:
+                LOG.exception("GET /api/companion/glance error: %s", exc)
+                self._send_json(500, {"success": False, "error": str(exc)})
             return
 
         super().do_GET()

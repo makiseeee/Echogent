@@ -793,6 +793,11 @@
       <button class="dev-btn" onclick="triggerSpeech('（检测到有人靠近，已静默保护桌面隐私）', 3)">防社死遮蔽</button>
     </div>
 
+    <div style="font-size: 11px; color: #888; margin-top: 4px;">多模态视觉感知 (VLM):</div>
+    <div class="dev-btns">
+      <button class="dev-btn" style="color: #a3be8c; border-color: rgba(163,190,140,0.4);" onclick="triggerDeskGlance()">📷 偷瞄工位实况</button>
+    </div>
+
     <div style="font-size: 11px; color: #888; margin-top: 4px;">Stage 4 拟真手势测试:</div>
     <div class="dev-btns">
       <button class="dev-btn" onclick="triggerSingleTapGesture(container.clientWidth*0.5, container.clientHeight*0.25)">摸头微笑</button>
@@ -1535,6 +1540,24 @@
         });
         showSilenceToast('屏幕亮度已固定为 ' + val, '💡');
       } catch(e) {}
+    }
+
+    async function triggerDeskGlance() {
+      showSilenceToast('正在偷瞄工位桌前...', '📷');
+      try {
+        const res = await fetch('/api/companion/glance?t=' + Date.now());
+        if (res.ok) {
+          const data = await res.json();
+          if (data.reply) {
+            triggerSpeech(data.reply, 1);
+            showSilenceToast('工位偷瞄完成！', '✨');
+          }
+        } else {
+          showSilenceToast('偷瞄请求失败，请检查网络', '⚠️');
+        }
+      } catch (e) {
+        showSilenceToast('偷瞄服务暂不可用', '⚠️');
+      }
     }
 
     // 点击任意非交互区域自动请求原生全屏 (隐藏浏览器地址栏与导航条)

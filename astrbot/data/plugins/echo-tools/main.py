@@ -36,6 +36,7 @@ from core.token_interceptor import TokenInterceptor
 from obsidian.obsidian_facade import ObsidianFacade
 from sentries.companion_hud import CompanionHUD
 from sentries.supervisor import SentrySupervisor
+from services.desk_glance import DeskGlanceService
 from services.model_switcher import ModelSwitcher
 from services.safe_calculator import SafeCalculator
 from services.usage_reporter import UsageReporter
@@ -61,6 +62,7 @@ class EchoTools(Star):
         self.calculator = SafeCalculator()
         self.voice_transcriber = VoiceTranscriber()
         self.web_fetcher = WebFetcher()
+        self.desk_glance = DeskGlanceService()
 
         # 3. 知识库与日常任务门面
         self.obsidian = ObsidianFacade(self.config)
@@ -129,6 +131,20 @@ class EchoTools(Star):
         info = await self.sentries.battery.fetch_battery_info()
         yield event.plain_result(self.sentries.battery.format_command_report(info))
 
+    @filter.command("看我")
+    async def glance_me_command(self, event: AstrMessageEvent):
+        """偷瞄工位桌前文博实况并结合电脑活动破壁互动。"""
+        pc_act = getattr(self.sentries.pc, "activity", {})
+        reply = await self.desk_glance.glance_desk(pc_activity=pc_act, reason="command_glance")
+        yield event.plain_result(reply)
+
+    @filter.command("偷瞄")
+    async def glance_desk_command(self, event: AstrMessageEvent):
+        """偷瞄工位桌前文博实况并结合电脑活动破壁互动。"""
+        pc_act = getattr(self.sentries.pc, "activity", {})
+        reply = await self.desk_glance.glance_desk(pc_activity=pc_act, reason="command_glance")
+        yield event.plain_result(reply)
+
     # ==========================================
     # 消息与推理事件钩子 (LLM Hooks)
     # ==========================================
@@ -167,12 +183,36 @@ class EchoTools(Star):
 
     @filter.on_llm_request(priority=30)
     async def inject_computer_status(self, event: AstrMessageEvent, req: ProviderRequest) -> None:
-        """实时捕获 PC 状态，根据对话意图向 System Prompt 注入桌面情境。"""
+        """实时捕获 PC 状态与工位多模态视觉，根据对话意图向 System Prompt 注入桌面情境。"""
         user_msg = ""
         if hasattr(event, "message_str") and event.message_str:
             user_msg = str(event.message_str).strip()
         elif req.prompt:
             user_msg = str(req.prompt).strip()
+
+        # 检查是否为文博主动询问“在干嘛/看我”等意图
+        user_msg_lower = user_msg.lower()
+        inquiry_kws = ["猜猜我在", "猜猜我", "我在干嘛", "我在做什么", "看我干嘛", "你看我干嘛", "你在看我吗", "看我在", "知道我在", "猜猜"]
+        if any(kw in user_msg_lower for kw in inquiry_kws):
+            try:
+                ok, vision_detail = await self.desk_glance.observe_desk(self.sentries.pc.activity)
+                if ok and vision_detail:
+                    act = getattr(self.sentries.pc, "activity", {})
+                    human_act = self.sentries.pc.humanize_pc_activity(act) if hasattr(self.sentries.pc, "humanize_pc_activity") else "用电脑"
+                    dur = act.get("duration_minutes", 0) if act else 0
+                    vision_status = (
+                        f"【实时物理视觉与电脑联动感知 · 文博主动询问自己在干嘛】：\n"
+                        f"你通过桌面伴侣摄像头刚刚偷瞄了工位一眼，亲眼看到文博现实细节：【{vision_detail}】。\n"
+                        f"电脑前台实时状态：正在【{human_act}】" + (f"（已持续专注 {dur} 分钟）" if dur > 1 else "") + "。\n"
+                        f"请用你傲娇、嘴硬心软的女友口吻直接调侃他（结合看到的真实动作/穿着/桌面细节，点出电脑正开着呢，当我瞎呀），"
+                        f"口语化、生活化，严禁生硬背诵窗口全名！严禁说你不知道或瞎猜！"
+                    )
+                    req.system_prompt = f"{req.system_prompt.strip()}\n\n{vision_status}\n" if req.system_prompt else vision_status
+                    logger.info(f"[EchoTools] 成功注入工位多模态视觉细节: {vision_detail[:40]}")
+                    return
+            except Exception as e:
+                logger.warning(f"[EchoTools] 多模态偷瞄注入提示词异常: {e}")
+
         self.sentries.pc.inject_status_to_prompt(req, user_msg, text_part_cls=TextPart)
 
     @filter.on_decorating_result()
