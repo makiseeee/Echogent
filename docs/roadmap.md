@@ -55,7 +55,7 @@
 │  - P1: 消除 Obsidian 代码双生 (已达成 100% · SSOT 统一)                   │
 │  - P2: Obsidian 本地 SQLite FTS5 全文索引 (已达成 100% · BM25 毫秒级检索) │
 │  - P3: 哨兵微模块轻量 Pub/Sub 进程内事件总线 (已达成 100% · core/event_bus.py) │
-│  - P4: PC Agent 从手机定时轮询升级为 PC 变化主动推送 (WebSocket)        │
+│  - P4: PC Agent 从手机定时轮询升级为 PC 变化主动推送 (已达成 100% · WebSocket) │
 │  - P5: 手机数据自动化一致性热备归档 (SQLite WAL)                        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -211,7 +211,7 @@
   - 基于 Python 原生 `sqlite3` FTS5 (`trigram` + `LIKE` 短词回退) 建立增量全文检索库（`.obsidian/echo_vault_index.db`）；三重入库保证（写穿 Write-through、拉取懒刷新与 0-hit 容错重试），MIX 2 真机实测 387 篇笔记检索从线性秒级降至 12~28ms，原生支持中文与 BM25 相关度排序。
 - [x] **P3: 哨兵微模块轻量 Pub/Sub 进程内事件总线 (`core/event_bus.py`)** ✅ 已达成
   - 纯 Python 3.12 标准库异步 `EventBus`（零 C 扩展），支持多订阅者并发、强类型事件继承匹配与异常隔离；`BatterySentry`、`PCProber`、`MindArbiter`、`CompanionHUD` 和 `SentrySupervisor` 彻底解耦，消除直接对象引用与多层回调透传，真机平滑热启挂载完毕。
-- [ ] **P4: PC Agent 从“手机定时轮询”升级为“PC 变化主动推送 (WebSocket)”**
-  - PC 端 `echo_pc_agent` 增设 `/ws/activity` 端点，仅在前台窗口或锁屏状态变化时推流；手机端维持 WebSocket 长连接，实现零空转开销与毫秒级情境感知。
+- [x] **P4: PC Agent 从“手机定时轮询”升级为“PC 变化主动推送 (WebSocket)”** ✅ 已达成
+  - PC 端基于纯标准库零外部依赖实现 RFC 6455 原生 WebSocket 握手与文本帧封装（`/ws/activity`），后台以 1s 节流采样仅在活动变化/心跳时广播；手机端 `aiohttp` 建立长连接并在推流到达瞬间通过 EventBus 派发 `PCActivityEvent`，断线自动退避重连并保留 HTTP 回退兼容，感知延迟降至毫秒级。
 - [ ] **P5: 手机数据自动化一致性备份**
   - 编写 SQLite WAL 模式安全热备脚本，定期通过 USB / SSH 将手机 `data_v4.db`、`echo-tools-token-usage.db` 拉回电脑端建立轮转归档。

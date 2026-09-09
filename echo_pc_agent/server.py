@@ -1,10 +1,15 @@
+import base64
+import hashlib
 import hmac
 import json
 import os
+import socket
+import struct
+import threading
+import time
+from typing import Optional
 import urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import threading
-from typing import Optional
 
 from modules.activity import tracker
 
@@ -106,35 +111,39 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
 
     <script>
+        function renderReport(data) {
+            document.getElementById('app-name').innerText = data.app || '未知应用';
+            document.getElementById('app-category').innerText = data.category || 'other';
+            document.getElementById('window-title').innerText = data.window_title || '(无标题)';
+            document.getElementById('summary-text').innerText = data.summary || '';
+            document.getElementById('duration-val').innerText = (data.duration_minutes || 0) + ' 分钟';
+            document.getElementById('idle-val').innerText = (data.idle_seconds || 0) + ' 秒';
+
+            const vSafe = data.visual_safe ? '✅ 允许' : '❌ 阻断';
+            document.getElementById('visual-val').innerText = vSafe;
+            document.getElementById('visual-val').style.color = data.visual_safe ? 'var(--accent-green)' : 'var(--accent-red)';
+
+            if (data.privacy_mode) {
+                document.getElementById('badge-status').innerText = '🛡️ 隐私保护中 (WS 实时)';
+                document.getElementById('badge-status').style.color = 'var(--accent-yellow)';
+            } else {
+                document.getElementById('badge-status').innerText = '● 实时推流中 (8766)';
+                document.getElementById('badge-status').style.color = 'var(--accent-green)';
+            }
+
+            if (data.macro_session) {
+                document.getElementById('macro-theme').innerText = '宏观主题: ' + (data.macro_session.theme || '-');
+                const b = data.macro_session.breakdown || {};
+                const items = Object.entries(b).map(([k, v]) => `${k}: ${v}%`);
+                document.getElementById('macro-breakdown').innerText = '近半小时时间片: ' + (items.join(' | ') || '采样中');
+            }
+        }
+
         async function fetchStatus() {
             try {
                 const res = await fetch('/api/pc/activity?level=detail');
                 const data = await res.json();
-                document.getElementById('app-name').innerText = data.app || '未知应用';
-                document.getElementById('app-category').innerText = data.category || 'other';
-                document.getElementById('window-title').innerText = data.window_title || '(无标题)';
-                document.getElementById('summary-text').innerText = data.summary || '';
-                document.getElementById('duration-val').innerText = (data.duration_minutes || 0) + ' 分钟';
-                document.getElementById('idle-val').innerText = (data.idle_seconds || 0) + ' 秒';
-                
-                const vSafe = data.visual_safe ? '✅ 允许' : '❌ 阻断';
-                document.getElementById('visual-val').innerText = vSafe;
-                document.getElementById('visual-val').style.color = data.visual_safe ? 'var(--accent-green)' : 'var(--accent-red)';
-
-                if (data.privacy_mode) {
-                    document.getElementById('badge-status').innerText = '🛡️ 隐私保护中';
-                    document.getElementById('badge-status').style.color = 'var(--accent-yellow)';
-                } else {
-                    document.getElementById('badge-status').innerText = '● 正常运行中';
-                    document.getElementById('badge-status').style.color = 'var(--accent-green)';
-                }
-
-                if (data.macro_session) {
-                    document.getElementById('macro-theme').innerText = '宏观主题: ' + (data.macro_session.theme || '-');
-                    const b = data.macro_session.breakdown || {};
-                    const items = Object.entries(b).map(([k, v]) => `${k}: ${v}%`);
-                    document.getElementById('macro-breakdown').innerText = '近半小时时间片: ' + (items.join(' | ') || '采样中');
-                }
+                renderReport(data);
             } catch (e) {
                 document.getElementById('badge-status').innerText = '⚠️ 连接断开';
                 document.getElementById('badge-status').style.color = 'var(--accent-red)';
@@ -158,12 +167,123 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             fetchStatus();
         }
 
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${proto}//${location.host}/ws/activity`);
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    renderReport(data);
+                } catch (e) {}
+            };
+            ws.onerror = () => {
+                fetchStatus();
+            };
+            ws.onclose = () => {
+                document.getElementById('badge-status').innerText = '⚠️ WS 断开，重连中...';
+                document.getElementById('badge-status').style.color = 'var(--accent-red)';
+                setTimeout(connectWS, 3000);
+            };
+        }
+
         fetchStatus();
-        setInterval(fetchStatus, 3000);
+        connectWS();
     </script>
 </body>
 </html>
 """
+
+
+def encode_ws_frame(payload_bytes: bytes, opcode: int = 0x1) -> bytes:
+    """封装标准 RFC 6455 服务端下发帧（不加掩码）。"""
+    length = len(payload_bytes)
+    if length < 126:
+        header = bytes([0x80 | (opcode & 0x0F), length])
+    elif length <= 0xFFFF:
+        header = struct.pack("!BBH", 0x80 | (opcode & 0x0F), 126, length)
+    else:
+        header = struct.pack("!BBQ", 0x80 | (opcode & 0x0F), 127, length)
+    return header + payload_bytes
+
+
+def read_ws_frame(sock: socket.socket) -> tuple[int, bytes]:
+    """读取客户端上行 RFC 6455 帧（带掩码解码）。"""
+    head = sock.recv(2)
+    if not head or len(head) < 2:
+        raise ConnectionResetError("Socket closed")
+    byte1, byte2 = head[0], head[1]
+    opcode = byte1 & 0x0F
+    is_masked = (byte2 & 0x80) != 0
+    payload_len = byte2 & 0x7F
+
+    if payload_len == 126:
+        ext = sock.recv(2)
+        if len(ext) < 2:
+            raise ConnectionResetError("Socket closed")
+        payload_len = struct.unpack("!H", ext)[0]
+    elif payload_len == 127:
+        ext = sock.recv(8)
+        if len(ext) < 8:
+            raise ConnectionResetError("Socket closed")
+        payload_len = struct.unpack("!Q", ext)[0]
+
+    mask = b""
+    if is_masked:
+        mask = sock.recv(4)
+        if len(mask) < 4:
+            raise ConnectionResetError("Socket closed")
+
+    data = bytearray()
+    while len(data) < payload_len:
+        chunk = sock.recv(min(4096, payload_len - len(data)))
+        if not chunk:
+            raise ConnectionResetError("Socket closed")
+        data.extend(chunk)
+
+    if is_masked:
+        for i in range(len(data)):
+            data[i] ^= mask[i % 4]
+
+    return opcode, bytes(data)
+
+
+class WSClient:
+    """包装单客户端 WebSocket 线程安全发送与连接状态。"""
+
+    def __init__(self, sock: socket.socket):
+        self.sock = sock
+        self.lock = threading.Lock()
+        self.closed = False
+
+    def send_text(self, text: str) -> None:
+        if self.closed:
+            return
+        frame = encode_ws_frame(text.encode("utf-8"), opcode=0x1)
+        with self.lock:
+            self.sock.sendall(frame)
+
+    def send_pong(self, payload: bytes) -> None:
+        if self.closed:
+            return
+        frame = encode_ws_frame(payload, opcode=0xA)
+        with self.lock:
+            self.sock.sendall(frame)
+
+    def close(self) -> None:
+        if self.closed:
+            return
+        self.closed = True
+        try:
+            frame = encode_ws_frame(b"", opcode=0x8)
+            with self.lock:
+                self.sock.sendall(frame)
+        except Exception:
+            pass
+        try:
+            self.sock.close()
+        except Exception:
+            pass
+
 
 class EchoRequestHandler(BaseHTTPRequestHandler):
     def _apply_cors(self):
@@ -173,7 +293,7 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
             allowed = any(kw in origin for kw in ("localhost", "127.0.0.1", "10.144.", "192.168."))
             if allowed:
                 self.send_header("Access-Control-Allow-Origin", origin)
-                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+                self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Sec-WebSocket-Key, Sec-WebSocket-Version, Upgrade")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
     def _is_authenticated(self) -> bool:
@@ -219,7 +339,56 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/pc/health":
-            self._send_json({"status": "ok", "service": "echo-pc-agent", "version": "2.0.0"})
+            self._send_json({"status": "ok", "service": "echo-pc-agent", "version": "2.1.0", "websocket": True})
+            return
+
+        if path == "/ws/activity":
+            if not self._is_authenticated():
+                self._send_json({"error": "Unauthorized", "detail": "Valid Bearer token required"}, status=401)
+                return
+
+            ws_key = self.headers.get("Sec-WebSocket-Key")
+            if not ws_key:
+                self._send_json({"error": "Bad Request", "detail": "Missing Sec-WebSocket-Key"}, status=400)
+                return
+
+            magic = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+            accept_val = base64.b64encode(hashlib.sha1(ws_key.encode("utf-8") + magic).digest()).decode("utf-8")
+
+            self.send_response(101, "Switching Protocols")
+            self.send_header("Upgrade", "websocket")
+            self.send_header("Connection", "Upgrade")
+            self.send_header("Sec-WebSocket-Accept", accept_val)
+            self.end_headers()
+
+            # 将底层 Socket 转交至 WSClient 管理并保活
+            sock = self.connection
+            sock.settimeout(2.0)
+            client = WSClient(sock)
+            if hasattr(self.server, "register_ws_client"):
+                self.server.register_ws_client(client)
+
+            try:
+                # 握手建立成功后，即刻下发当前全量详情快照
+                initial_report = tracker.get_report(level="detail")
+                client.send_text(json.dumps(initial_report, ensure_ascii=False))
+
+                # 挂起工作线程，持续监听 Ping/Pong 与断开控制帧
+                while getattr(self.server, "running", True) and not client.closed:
+                    try:
+                        opcode, payload = read_ws_frame(sock)
+                        if opcode == 0x8:  # Close
+                            break
+                        elif opcode == 0x9:  # Ping -> Pong
+                            client.send_pong(payload)
+                    except socket.timeout:
+                        continue
+                    except (ConnectionResetError, BrokenPipeError, OSError):
+                        break
+            finally:
+                if hasattr(self.server, "unregister_ws_client"):
+                    self.server.unregister_ws_client(client)
+                client.close()
             return
 
         try:
@@ -255,20 +424,92 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
         # 静默日志，避免刷屏
         pass
 
+
 class AgentServer:
     def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
         self.host = host or os.environ.get("ECHO_PC_HOST", "0.0.0.0")
         self.port = port or int(os.environ.get("ECHO_PC_PORT", "8766"))
         self.server: Optional[ThreadingHTTPServer] = None
         self.thread: Optional[threading.Thread] = None
+        self.broadcaster_thread: Optional[threading.Thread] = None
+        self.running = False
+        self.ws_clients: set[WSClient] = set()
+        self.ws_lock = threading.Lock()
+
+    def register_ws_client(self, client: WSClient) -> None:
+        with self.ws_lock:
+            self.ws_clients.add(client)
+        print(f"[Server] WebSocket client connected. Active clients: {len(self.ws_clients)}")
+
+    def unregister_ws_client(self, client: WSClient) -> None:
+        with self.ws_lock:
+            self.ws_clients.discard(client)
+        print(f"[Server] WebSocket client disconnected. Active clients: {len(self.ws_clients)}")
+
+    def broadcast(self, data: dict) -> None:
+        """向所有已连接的 WebSocket 客户端主动广播 JSON 状态帧。"""
+        text = json.dumps(data, ensure_ascii=False)
+        with self.ws_lock:
+            clients = list(self.ws_clients)
+        for client in clients:
+            try:
+                client.send_text(text)
+            except Exception:
+                with self.ws_lock:
+                    self.ws_clients.discard(client)
+                client.close()
+
+    def _broadcaster_loop(self) -> None:
+        """后台感知检测线程：仅在活动状态变化或心跳超时时主动向客户端推流。"""
+        last_snapshot = None
+        last_heartbeat = 0.0
+        while self.running:
+            try:
+                time.sleep(1.0)
+                with self.ws_lock:
+                    has_clients = bool(self.ws_clients)
+                if not has_clients:
+                    continue
+
+                report = tracker.get_report(level="detail")
+                snapshot = (
+                    report.get("app"),
+                    report.get("category"),
+                    report.get("window_title"),
+                    report.get("is_locked"),
+                    report.get("privacy_mode"),
+                    report.get("duration_minutes"),
+                    (report.get("idle_seconds", 0) // 60),
+                )
+                now = time.time()
+                if snapshot != last_snapshot or (now - last_heartbeat >= 60.0):
+                    last_snapshot = snapshot
+                    last_heartbeat = now
+                    self.broadcast(report)
+            except Exception as exc:
+                print(f"[Server] Broadcaster error: {exc}")
 
     def start(self):
+        self.running = True
         self.server = ThreadingHTTPServer((self.host, self.port), EchoRequestHandler)
+        self.server.running = True
+        self.server.register_ws_client = self.register_ws_client
+        self.server.unregister_ws_client = self.unregister_ws_client
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        print(f"[Server] Echo PC Agent HTTP Server running on http://{self.host}:{self.port}")
+
+        self.broadcaster_thread = threading.Thread(target=self._broadcaster_loop, daemon=True)
+        self.broadcaster_thread.start()
+        print(f"[Server] Echo PC Agent running on http://{self.host}:{self.port} (WebSocket /ws/activity enabled)")
 
     def stop(self):
+        self.running = False
+        if self.server:
+            self.server.running = False
+        with self.ws_lock:
+            for c in list(self.ws_clients):
+                c.close()
+            self.ws_clients.clear()
         if self.server:
             self.server.shutdown()
             self.server.server_close()

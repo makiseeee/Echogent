@@ -6,8 +6,8 @@ import time
 from collections import deque
 from typing import Dict, Any, Optional
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
+user32 = ctypes.windll.user32 if hasattr(ctypes, "windll") else None
+kernel32 = ctypes.windll.kernel32 if hasattr(ctypes, "windll") else None
 
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
@@ -67,6 +67,8 @@ class ActivityTracker:
         self._cached_activity: Dict[str, Any] = {}
 
     def _ensure_desktop(self):
+        if not user32:
+            return
         try:
             hdesk = user32.OpenDesktopW("default", 0, False, 0x01FF)
             if hdesk:
@@ -76,6 +78,8 @@ class ActivityTracker:
             pass
 
     def get_system_idle_seconds(self) -> int:
+        if not user32 or not kernel32:
+            return 0
         self._ensure_desktop()
         lii = LASTINPUTINFO()
         lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
@@ -85,6 +89,8 @@ class ActivityTracker:
         return 0
 
     def get_raw_foreground_window(self) -> Dict[str, Any]:
+        if not user32 or not kernel32:
+            return {"hwnd": 0, "title": "Linux/WSL Test Environment", "process_name": "python", "pid": 0}
         self._ensure_desktop()
         hwnd = user32.GetForegroundWindow()
         if not hwnd:

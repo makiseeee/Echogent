@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import socket
 import time
@@ -40,11 +41,27 @@ class PCProber:
                 )
             )
 
-    async def probe_computer(self, timeout_sec: float = 2.0) -> tuple[bool, str]:
-        """优先探测台式机 PC Agent，获取前台实时活动与状态。"""
+    async def _apply_payload(self, payload: dict[str, Any]) -> None:
+        """统一解析并应用 PC 状态快照，驱动 EventBus 派发。"""
         prev_online = self.online
         prev_activity = dict(self.activity)
 
+        if payload.get("status") == "online" or bool(payload.get("app")):
+            self.online = True
+            self.activity = payload
+            self.last_probe_ts = time.time()
+            app = str(payload.get("app", "") or "")
+            summary = str(payload.get("summary", "") or "")
+            self.detail = f"{app} ({summary})" if summary else app
+        else:
+            self.online = False
+            self.activity = {}
+            self.detail = "电脑离线"
+
+        await self._notify_if_changed(prev_online, prev_activity)
+
+    async def probe_computer(self, timeout_sec: float = 2.0) -> tuple[bool, str]:
+        """优先探测台式机 PC Agent，获取前台实时活动与状态 (HTTP 回退兼容)。"""
         host = os.environ.get("ECHO_PC_AGENT_HOST", "10.144.232.236")
         port = int(os.environ.get("ECHO_PC_AGENT_PORT", "8766"))
         pc_agent_url = f"http://{host}:{port}/api/pc/activity?level=detail"
@@ -57,16 +74,10 @@ class PCProber:
                 if resp.status == 200:
                     payload = await resp.json(content_type=None)
                     if isinstance(payload, dict) and (payload.get("status") == "online" or bool(payload.get("app"))):
-                        self.online = True
-                        self.activity = payload
-                        self.last_probe_ts = time.time()
-                        app = payload.get("app", "")
-                        summary = payload.get("summary", "")
-                        self.detail = f"{app} ({summary})"
-                        await self._notify_if_changed(prev_online, prev_activity)
+                        await self._apply_payload(payload)
                         return True, self.detail
         except Exception as exc:
-            logger.debug(f"[PCProber] 探测 PC Agent 异常: {exc}")
+            logger.debug(f"[PCProber] 探测 PC Agent HTTP 异常: {exc}")
 
         # 若 PC Agent 暂未响应，尝试回落至传统 MCP 服务检测
         try:
@@ -83,25 +94,67 @@ class PCProber:
 
         # 仅在超过 60 秒未成功取得 PC 状态时才判定离线并清空活动
         if time.time() - self.last_probe_ts > 60:
+            prev_online = self.online
+            prev_activity = dict(self.activity)
             self.online = mcp_online
             self.detail = mcp_detail
             if not mcp_online:
                 self.activity = {}
+            await self._notify_if_changed(prev_online, prev_activity)
 
-        await self._notify_if_changed(prev_online, prev_activity)
         return self.online, self.detail
 
+    async def _ws_listener_loop(self) -> None:
+        """维持与 PC Agent 的 WebSocket 实时推流长连接。"""
+        host = os.environ.get("ECHO_PC_AGENT_HOST", "10.144.232.236")
+        port = int(os.environ.get("ECHO_PC_AGENT_PORT", "8766"))
+        token = os.environ.get("ECHO_PC_TOKEN", "").strip()
+        ws_url = f"ws://{host}:{port}/ws/activity"
+        if token:
+            ws_url += f"?token={token}"
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+        session = await HttpClient.get_session()
+        logger.debug(f"[PCProber] 正在建立 PC WebSocket 连接: {ws_url}")
+        async with session.ws_connect(
+            ws_url,
+            headers=headers,
+            heartbeat=25.0,
+            timeout=aiohttp.ClientWSTimeout(ws_close=5.0),
+        ) as ws:
+            logger.info(f"[PCProber] PC Agent WebSocket 实时推流已就绪 ({host}:{port})")
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    try:
+                        data = json.loads(msg.data)
+                        if isinstance(data, dict):
+                            await self._apply_payload(data)
+                    except Exception as e:
+                        logger.warning(f"[PCProber] 解析 WebSocket 报文异常: {e}")
+                elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    break
+
     async def background_prober_loop(self) -> None:
-        """静默后台心跳：在线 20 秒、离线 35 秒探测一次 PC 状态。"""
+        """后台实时守护：优先 WebSocket 毫秒级推流，断线自愈退避重连。"""
+        logger.info("[PCProber] 启动 PC 实时感知守护 (WebSocket 模式)")
+        retry_delay = 5.0
         while True:
             try:
-                await self.probe_computer(timeout_sec=2.0)
-                await asyncio.sleep(20 if self.online else 35)
+                await self._ws_listener_loop()
+                retry_delay = 5.0
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:  # noqa: BLE001
-                logger.error(f"[PCProber] background computer prober error: {exc}")
-                await asyncio.sleep(30)
+            except Exception as exc:
+                logger.debug(f"[PCProber] WebSocket 连接断开或未上线: {exc}，将在 {retry_delay:.0f}s 后重试")
+                if self.online and (time.time() - self.last_probe_ts > 30):
+                    prev_online = self.online
+                    prev_activity = dict(self.activity)
+                    self.online = False
+                    self.detail = "电脑离线"
+                    await self._notify_if_changed(prev_online, prev_activity)
+
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 1.5, 30.0)
 
     @staticmethod
     def humanize_pc_activity(act: dict[str, Any]) -> str:
