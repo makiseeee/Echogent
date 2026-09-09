@@ -12,6 +12,7 @@ import urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 from modules.activity import tracker
+from modules.app_registry import registry
 
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="zh-CN">
@@ -105,6 +106,44 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <pre id="api-output">// 点击上方按钮实时查看 API 报文返回</pre>
         </div>
 
+        <div class="card">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>📱 软件分类与权限管理 (App Registry)</span>
+                <span id="apps-count-badge" class="badge" style="background: rgba(94, 129, 172, 0.2); color: var(--accent);">加载中...</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                <input type="text" id="app-search" placeholder="搜索软件名称或进程名..." style="flex: 1; min-width: 140px; background: #15161b; border: 1px solid var(--border-color); color: var(--text-main); padding: 7px 12px; border-radius: 6px; font-size: 12px;" oninput="filterApps()">
+                <select id="cat-filter" style="background: #15161b; border: 1px solid var(--border-color); color: var(--text-main); padding: 7px 10px; border-radius: 6px; font-size: 12px;" onchange="filterApps()">
+                    <option value="">全部分类</option>
+                    <option value="coding">研发与代码工程 (coding)</option>
+                    <option value="hardware_embedded">嵌入式与硬件 EDA (hardware_embedded)</option>
+                    <option value="research_simulation">科学计算与学术科研 (research_simulation)</option>
+                    <option value="creative_design">数字影音制作与设计 (creative_design)</option>
+                    <option value="gaming">游戏竞技与泛娱乐 (gaming)</option>
+                    <option value="communication_meeting">通讯社交与会议网课 (communication_meeting)</option>
+                    <option value="productivity_system">日常生产力与系统工具 (productivity_system)</option>
+                    <option value="other">其他未分类 (other)</option>
+                </select>
+                <button onclick="loadApps()" style="padding: 7px 14px;">刷新</button>
+            </div>
+            <div id="apps-table-container" style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                    <thead style="position: sticky; top: 0; background: #202229; color: var(--text-sub); border-bottom: 1px solid var(--border-color);">
+                        <tr>
+                            <th style="padding: 8px 10px;">进程 / 软件</th>
+                            <th style="padding: 8px 10px;">分类</th>
+                            <th style="padding: 8px 10px; text-align: center;">视觉许可</th>
+                            <th style="padding: 8px 10px; text-align: center;">强免打扰</th>
+                        </tr>
+                    </thead>
+                    <tbody id="apps-tbody">
+                        <tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-sub);">加载软件清单中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="apps-toast" style="font-size: 12px; color: var(--accent-green); margin-top: 8px; display: none;"></div>
+        </div>
+
         <div class="footer">
             Echo 智能桌面伴侣系统 · PC 侧无缝感知基座 · ZeroTier 内部私网专供
         </div>
@@ -186,8 +225,79 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             };
         }
 
+        let allApps = [];
+        async function loadApps() {
+            try {
+                const res = await fetch('/api/pc/apps');
+                const data = await res.json();
+                allApps = data.apps || [];
+                document.getElementById('apps-count-badge').innerText = `${allApps.length} 款软件就绪`;
+                filterApps();
+            } catch (e) {
+                document.getElementById('apps-tbody').innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--accent-red); padding: 15px;">加载失败: ${e}</td></tr>`;
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function filterApps() {
+            const q = (document.getElementById('app-search').value || '').trim().toLowerCase();
+            const cat = document.getElementById('cat-filter').value;
+            const filtered = allApps.filter(a => {
+                const matchQ = !q || a.exe_name.toLowerCase().includes(q) || (a.app_name || '').toLowerCase().includes(q);
+                const matchCat = !cat || a.category === cat;
+                return matchQ && matchCat;
+            });
+
+            const tbody = document.getElementById('apps-tbody');
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-sub); padding: 15px;">未找到匹配软件</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(a => `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 6px 10px;">
+                        <div style="font-weight: 500; color: #eceff4;">${escapeHtml(a.app_name || a.exe_name)}</div>
+                        <div style="font-size: 11px; color: var(--text-sub); font-family: monospace;">${escapeHtml(a.exe_name)}</div>
+                    </td>
+                    <td style="padding: 6px 10px; color: var(--accent);">${escapeHtml(a.subcategory || a.category)}</td>
+                    <td style="padding: 6px 10px; text-align: center;">
+                        <input type="checkbox" ${a.visual_safe ? 'checked' : ''} onchange="updateAppPerm('${a.exe_name}', 'visual_safe', this.checked)">
+                    </td>
+                    <td style="padding: 6px 10px; text-align: center;">
+                        <input type="checkbox" ${a.dnd_inhibit ? 'checked' : ''} onchange="updateAppPerm('${a.exe_name}', 'dnd_inhibit', this.checked)">
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function updateAppPerm(exe, field, val) {
+            const toast = document.getElementById('apps-toast');
+            try {
+                const res = await fetch('/api/pc/apps/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ exe_name: exe, [field]: val })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    const item = allApps.find(x => x.exe_name === exe);
+                    if (item) item[field] = val;
+                    toast.style.display = 'block';
+                    toast.innerText = `✓ 已更新 ${exe} 的配置 (${field}=${val})`;
+                    setTimeout(() => { toast.style.display = 'none'; }, 2500);
+                }
+            } catch (e) {
+                alert('更新失败: ' + e);
+            }
+        }
+
         fetchStatus();
         connectWS();
+        loadApps();
     </script>
 </body>
 </html>
@@ -402,6 +512,16 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(report)
                 return
 
+            if path == "/api/pc/apps":
+                if not self._is_authenticated():
+                    self._send_json({"error": "Unauthorized", "detail": "Valid Bearer token required"}, status=401)
+                    return
+                params = urllib.parse.parse_qs(parsed.query)
+                category = params.get("category", [None])[0]
+                apps = registry.list_apps(category=category)
+                self._send_json({"status": "ok", "total": len(apps), "apps": apps})
+                return
+
             self._send_json({"error": "Not Found"}, status=404)
         except Exception as e:
             self._send_json({"error": "Internal Server Error", "detail": str(e)}, status=500)
@@ -416,6 +536,33 @@ class EchoRequestHandler(BaseHTTPRequestHandler):
                 return
             tracker.privacy_mode = not tracker.privacy_mode
             self._send_json({"status": "ok", "privacy_mode": tracker.privacy_mode})
+            return
+
+        if path == "/api/pc/apps/update":
+            if not self._is_authenticated():
+                self._send_json({"error": "Unauthorized", "detail": "Valid Bearer token required"}, status=401)
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            if length == 0:
+                self._send_json({"error": "Bad Request", "detail": "Missing body"}, status=400)
+                return
+            body_bytes = self.rfile.read(length)
+            try:
+                payload = json.loads(body_bytes.decode("utf-8"))
+            except Exception as e:
+                self._send_json({"error": "Bad Request", "detail": f"Invalid JSON: {e}"}, status=400)
+                return
+
+            exe_name = payload.get("exe_name", "").strip().lower()
+            if not exe_name:
+                self._send_json({"error": "Bad Request", "detail": "Missing exe_name"}, status=400)
+                return
+
+            success = registry.update_app(exe_name, payload)
+            if success:
+                self._send_json({"status": "ok", "app": registry.get(exe_name)})
+            else:
+                self._send_json({"error": "Internal Server Error", "detail": "Failed to update app"}, status=500)
             return
 
         self._send_json({"error": "Not Found"}, status=404)
